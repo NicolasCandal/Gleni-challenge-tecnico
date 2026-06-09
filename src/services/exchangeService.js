@@ -41,4 +41,10 @@ function obtenerSenal(cotizaciones) {
   })
 }
 
-module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenal }
+// Si tipos es un array vacío o undefined, devuelve todas las cotizaciones sin filtrar
+function filtrarPorTipos(cotizaciones, tipos) {
+  if (!tipos || tipos.length === 0) return cotizaciones
+  return cotizaciones.filter(c => tipos.includes(c.casa))
+}
+
+module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenal, filtrarPorTipos }
