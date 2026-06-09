@@ -6,16 +6,16 @@ const BLUELYTICS_URL = 'https://api.bluelytics.com.ar/v2/latest'
 
 async function fetchDeDolarApi() {
   const res = await fetch(DOLARAPI_URL, { signal: AbortSignal.timeout(5000) })
-  if (!res.ok) throw new Error(`dolarapi respondió ${res.status}`)
+  if (!res.ok) throw new Error(`dolarapi respondio ${res.status}`)
   const data = await res.json()
-  return GetDolarApiResponse.parse(data)
+  return { datos: GetDolarApiResponse.parse(data), fuente: 'dolarapi.com' }
 }
 
 async function fetchDeBluelytics() {
   const res = await fetch(BLUELYTICS_URL, { signal: AbortSignal.timeout(5000) })
   if (!res.ok) throw new Error(`bluelytics respondió ${res.status}`)
   const data = await res.json()
-  return normalizarBluelytics(data)
+  return { datos: normalizarBluelytics(data), fuente: 'bluelytics.com.ar' }
 }
 
 function normalizarBluelytics(data) {

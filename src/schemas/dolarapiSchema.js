@@ -8,7 +8,7 @@ const GetDolarApi = z.object({
     compra: z.number().nullable(),
     venta: z.number().nullable(),
     fechaActualizacion: z.string().datetime(),
-     variacion: z.number().optional()
+    variacion: z.number().optional()
 })
     
 const GetDolarApiResponse = z.array(GetDolarApi)
