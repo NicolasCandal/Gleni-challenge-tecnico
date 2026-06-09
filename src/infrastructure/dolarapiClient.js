@@ -1,0 +1,55 @@
+const { GetDolarApiResponse } = require('../schemas/dolarapiSchema')
+const { ExternalApiError } = require('../errors/ExternalApiError')
+
+const DOLARAPI_URL = 'https://dolarapi.com/v1/dolares'
+const BLUELYTICS_URL = 'https://api.bluelytics.com.ar/v2/latest'
+
+async function fetchDeDolarApi() {
+  const res = await fetch(DOLARAPI_URL, { signal: AbortSignal.timeout(5000) })
+  if (!res.ok) throw new Error(`dolarapi respondió ${res.status}`)
+  const data = await res.json()
+  return GetDolarApiResponse.parse(data)
+}
+
+async function fetchDeBluelytics() {
+  const res = await fetch(BLUELYTICS_URL, { signal: AbortSignal.timeout(5000) })
+  if (!res.ok) throw new Error(`bluelytics respondió ${res.status}`)
+  const data = await res.json()
+  return normalizarBluelytics(data)
+}
+
+function normalizarBluelytics(data) {
+  const ahora = new Date().toISOString()
+  return GetDolarApiResponse.parse([
+    {
+      moneda: 'USD',
+      casa: 'oficial',
+      nombre: 'Oficial',
+      compra: data.oficial?.value_buy ?? null,
+      venta: data.oficial?.value_sell ?? null,
+      fechaActualizacion: ahora
+    },
+    {
+      moneda: 'USD',
+      casa: 'blue',
+      nombre: 'Blue',
+      compra: data.blue?.value_buy ?? null,
+      venta: data.blue?.value_sell ?? null,
+      fechaActualizacion: ahora
+    }
+  ])
+}
+
+async function fetchExchangeRates() {
+  try {
+    return await fetchDeDolarApi()
+  } catch {
+    try {
+      return await fetchDeBluelytics()
+    } catch {
+      throw new ExternalApiError()
+    }
+  }
+}
+
+module.exports = { fetchExchangeRates }

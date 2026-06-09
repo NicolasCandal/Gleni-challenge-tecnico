@@ -1,6 +1,6 @@
-import { z } from "zod"
+const { z } = require('zod')
 
-export const GetDolarApi = z.object({
+const GetDolarApi = z.object({
     
     moneda: z.string(),
     casa: z.enum(['oficial', 'blue', 'bolsa', 'contadoconliqui', 'mayorista', 'cripto', 'tarjeta']),
