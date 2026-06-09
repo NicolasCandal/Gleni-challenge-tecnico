@@ -8,14 +8,14 @@ async function fetchDeDolarApi() {
   const res = await fetch(DOLARAPI_URL, { signal: AbortSignal.timeout(5000) })
   if (!res.ok) throw new Error(`dolarapi respondio ${res.status}`)
   const data = await res.json()
-  return { datos: GetDolarApiResponse.parse(data), fuente: 'dolarapi.com' }
+  return { datos: GetDolarApiResponse.parse(data), fuente: 'dolarapi.com', esFallback: false }
 }
 
 async function fetchDeBluelytics() {
   const res = await fetch(BLUELYTICS_URL, { signal: AbortSignal.timeout(5000) })
   if (!res.ok) throw new Error(`bluelytics respondió ${res.status}`)
   const data = await res.json()
-  return { datos: normalizarBluelytics(data), fuente: 'bluelytics.com.ar' }
+  return { datos: normalizarBluelytics(data), fuente: 'bluelytics.com.ar', esFallback: true }
 }
 
 function normalizarBluelytics(data) {

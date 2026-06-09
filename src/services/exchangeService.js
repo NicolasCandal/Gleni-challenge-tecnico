@@ -19,21 +19,25 @@ function ordenarParaComprar(cotizaciones) {
   return [...cotizaciones].sort((a, b) => a.venta - b.venta)
 }
 
-// Señal basada en brecha blue vs oficial:
-// brecha < 20% → mercado estable, sin urgencia → 'neutral'
-// brecha 20-60% → oportunidad para dolarizarse → 'buy'
-// brecha > 60% → mercado muy distorsionado, posible corrección → 'wait'
+// Señal por tipo basada en spread y brecha:
+// spread > 5% o brecha > 30% → operar es caro → 'esperar'
+// spread < 3% y brecha < 20%  → condiciones favorables → 'comprar'
+// resto                        → 'neutral'
+// Requiere que cotizaciones ya tenga spread y brecha calculados
 function obtenerSenal(cotizaciones) {
-  const blue = cotizaciones.find(c => c.casa === 'blue')
-  const oficial = cotizaciones.find(c => c.casa === 'oficial')
+  return cotizaciones.map(c => {
+    let senal
 
-  if (!blue || !oficial) return 'neutral'
+    if (c.spread > 5 || c.brecha > 30) {
+      senal = 'esperar'
+    } else if (c.spread < 3 && c.brecha < 20) {
+      senal = 'comprar'
+    } else {
+      senal = 'neutral'
+    }
 
-  const brecha = (blue.venta - oficial.venta) / oficial.venta * 100
-
-  if (brecha > 60) return 'esperar'
-  if (brecha >= 20) return 'comprar'
-  return 'neutral'
+    return { casa: c.casa, nombre: c.nombre, senal }
+  })
 }
 
 module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenal }
