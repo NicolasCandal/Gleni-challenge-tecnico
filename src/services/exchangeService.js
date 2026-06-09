@@ -19,18 +19,19 @@ function ordenarParaComprar(cotizaciones) {
   return [...cotizaciones].sort((a, b) => a.venta - b.venta)
 }
 
-// Señal por tipo basada en spread y brecha:
-// spread > 5% o brecha > 30% → operar es caro → 'esperar'
-// spread < 3% y brecha < 20%  → condiciones favorables → 'comprar'
-// resto                        → 'neutral'
-// Requiere que cotizaciones ya tenga spread y brecha calculados
+// Calibrado a junio 2026, post-salida del cepo: las brechas hoy viven entre ~0% y ~6%
+// (blue ~0%, MEP ~1%, CCL ~5%) y los spreads típicos rondan 1-1.5%.
+const UMBRALES = require('../config/umbrales')
+
+// Señal por tipo basada en spread (compra-venta del propio tipo) y brecha (vs. oficial).
+// Requiere que cotizaciones ya tenga spread y brecha calculados.
 function obtenerSenal(cotizaciones) {
   return cotizaciones.map(c => {
     let senal
 
-    if (c.spread > 5 || c.brecha > 30) {
+    if (c.spread > UMBRALES.SPREAD_ALTO || c.brecha > UMBRALES.BRECHA_ALTA) {
       senal = 'esperar'
-    } else if (c.spread < 3 && c.brecha < 20) {
+    } else if (c.spread < UMBRALES.SPREAD_BAJO && c.brecha < UMBRALES.BRECHA_BAJA) {
       senal = 'comprar'
     } else {
       senal = 'neutral'
