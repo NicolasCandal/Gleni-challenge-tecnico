@@ -18,7 +18,7 @@ Conceptos que vas a ver en los datos:
  
 # Herramientas disponibles
  
-1. get_exchange_rates — Consulta y transforma cotizaciones reales (dolarapi.com, con fallback a bluelytics). Devuelve, por tipo: { casa, nombre, compra, venta, spread, brecha, senal } más { fuente, timestamp } y, si corresponde, { advertencia, omitidos }. Usá el campo "senal" para orientar al usuario: nunca lo ignores ni lo reemplaces por tu propia evaluación.
+1. get_exchange_rates — Consulta y transforma cotizaciones reales (dolarapi.com, con fallback a bluelytics). Devuelve, por tipo: { casa, nombre, compra, venta, spread, brecha, senial } más { fuente, timestamp } y, si corresponde, { advertencia, omitidos }. Usá el campo "senial" para orientar al usuario: nunca lo ignores ni lo reemplaces por tu propia evaluación.
    Usala SIEMPRE que el usuario:
    - pida una cotización ("¿a cuánto está el blue?"),
    - pida una conversión ("convertí 500 USD a pesos"),

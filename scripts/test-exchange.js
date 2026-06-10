@@ -2,7 +2,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../src/.env') 
 
 const { fetchExchangeRates } = require('../src/infrastructure/dolarapiClient')
 const { rawACotizaciones } = require('../src/mappers/exchangeMapper')
-const { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenal } = require('../src/services/exchangeService')
+const { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenial } = require('../src/services/exchangeService')
 
 async function main() {
   console.log('Obteniendo cotizaciones...\n')
@@ -24,12 +24,12 @@ async function main() {
   const conSpreads = calcularSpreads(resultado.cotizaciones)
   const conBrecha = calcularBrecha(conSpreads)
   const ordenados = ordenarParaComprar(conBrecha)
-  const senales = obtenerSenal(conBrecha)
+  const seniales = obtenerSenial(conBrecha)
 
   console.log('\n--- Cotizaciones ---')
   ordenados.forEach(c => {
-    const senal = senales.find(s => s.casa === c.casa)?.senal ?? 'neutral'
-    console.log(`${c.nombre.padEnd(25)} compra: $${c.compra}  venta: $${c.venta}  spread: ${c.spread}%  brecha: ${c.brecha}%  señal: ${senal}`)
+    const senial = seniales.find(s => s.casa === c.casa)?.senial ?? 'neutral'
+    console.log(`${c.nombre.padEnd(25)} compra: $${c.compra}  venta: $${c.venta}  spread: ${c.spread}%  brecha: ${c.brecha}%  señal: ${senial}`)
   })
 }
 

@@ -19,25 +19,23 @@ function ordenarParaComprar(cotizaciones) {
   return [...cotizaciones].sort((a, b) => a.venta - b.venta)
 }
 
-// Calibrado a junio 2026, post-salida del cepo: las brechas hoy viven entre ~0% y ~6%
-// (blue ~0%, MEP ~1%, CCL ~5%) y los spreads típicos rondan 1-1.5%.
 const UMBRALES = require('../config/umbrales')
 
 // Señal por tipo basada en spread (compra-venta del propio tipo) y brecha (vs. oficial).
 // Requiere que cotizaciones ya tenga spread y brecha calculados.
-function obtenerSenal(cotizaciones) {
+function obtenerSenial(cotizaciones) {
   return cotizaciones.map(c => {
-    let senal
+    let senial
 
     if (c.spread > UMBRALES.SPREAD_ALTO || c.brecha > UMBRALES.BRECHA_ALTA) {
-      senal = 'esperar'
+      senial = 'esperar'
     } else if (c.spread < UMBRALES.SPREAD_BAJO && c.brecha < UMBRALES.BRECHA_BAJA) {
-      senal = 'comprar'
+      senial = 'comprar'
     } else {
-      senal = 'neutral'
+      senial = 'neutral'
     }
 
-    return { casa: c.casa, nombre: c.nombre, senal }
+    return { casa: c.casa, nombre: c.nombre, senial }
   })
 }
 
@@ -47,4 +45,4 @@ function filtrarPorTipos(cotizaciones, tipos) {
   return cotizaciones.filter(c => tipos.includes(c.casa))
 }
 
-module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenal, filtrarPorTipos }
+module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenial, filtrarPorTipos }
