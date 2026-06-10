@@ -1,6 +1,7 @@
 const repositorioMensaje = require('../repositories/messageRepository')
 const repositorioEjecucion = require('../repositories/toolExecutionRepository')
 
+
 const definicion = {
   name: 'generate_session_report',
   description: 'Genera un reporte de la sesión actual: total de consultas, herramientas usadas, latencia promedio, tipos de dólar consultados y errores. No llama a la API externa.',

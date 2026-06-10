@@ -16,6 +16,7 @@ const DEFINICIONES_HERRAMIENTAS = [
 ]
 
 const MAX_REINTENTOS = 2
+const MAX_ITERACIONES_TOOLS = 4
 const DEMORA_BASE_MS = 1000
 
 async function llamarOpenAI(mensajes, intento = 0) {
@@ -37,13 +38,17 @@ async function llamarOpenAI(mensajes, intento = 0) {
 }
 
 async function ejecutarHerramienta(llamada, idConversacion) {
-  const manejador = HERRAMIENTAS[llamada.function.name]
-  const entrada = JSON.parse(llamada.function.arguments)
+  const nombreHerramienta = llamada.function.name
   const inicio = Date.now()
+  let entrada = null
   let salida = null
   let errorMsg = null
 
   try {
+    const manejador = HERRAMIENTAS[nombreHerramienta]
+    if (!manejador) throw new Error(`herramienta desconocida: ${nombreHerramienta}`)
+
+    entrada = JSON.parse(llamada.function.arguments)
     salida = await manejador(entrada)
   } catch (err) {
     errorMsg = err.message
@@ -54,7 +59,7 @@ async function ejecutarHerramienta(llamada, idConversacion) {
   try {
     await repositorioEjecucion.crear({
       idConversacion,
-      nombreHerramienta: llamada.function.name,
+      nombreHerramienta,
       entrada,
       salida,
       latenciaMs,
@@ -77,25 +82,29 @@ async function chat(idConversacion, mensajeUsuario) {
   await servicioSesion.agregarMensaje({ idConversacion, rol: 'user', contenido: mensajeUsuario })
 
   const historial = await servicioSesion.obtenerHistorial(idConversacion)
-  const mensajes = [{ role: 'system', content: promptSistema }, ...historial]
+  let mensajes = [{ role: 'system', content: promptSistema }, ...historial]
 
-  const primeraRespuesta = await llamarOpenAI(mensajes)
-  const mensajeAsistente = primeraRespuesta.choices[0].message
+  let respuestaFinal = null
+  let iteracion = 0
 
-  if (mensajeAsistente.tool_calls?.length) {
+  while (iteracion < MAX_ITERACIONES_TOOLS) {
+    const respuesta = await llamarOpenAI(mensajes)
+    const mensajeAsistente = respuesta.choices[0].message
+    iteracion++
+
+    if (!mensajeAsistente.tool_calls?.length) {
+      respuestaFinal = mensajeAsistente.content
+      break
+    }
+
     const resultadosHerramientas = await Promise.all(
       mensajeAsistente.tool_calls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
     )
 
-    const mensajesConHerramientas = [...mensajes, mensajeAsistente, ...resultadosHerramientas]
-    const segundaRespuesta = await llamarOpenAI(mensajesConHerramientas)
-    const respuestaFinal = segundaRespuesta.choices[0].message.content
-
-    await servicioSesion.agregarMensaje({ idConversacion, rol: 'assistant', contenido: respuestaFinal })
-    return respuestaFinal
+    mensajes = [...mensajes, mensajeAsistente, ...resultadosHerramientas]
   }
 
-  const respuestaFinal = mensajeAsistente.content
+  respuestaFinal = respuestaFinal ?? 'No pude generar una respuesta.'
   await servicioSesion.agregarMensaje({ idConversacion, rol: 'assistant', contenido: respuestaFinal })
   return respuestaFinal
 }

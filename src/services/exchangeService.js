@@ -39,10 +39,17 @@ function obtenerSenial(cotizaciones) {
   })
 }
 
+// Embebe el campo senial directamente en cada cotización.
+// Requiere que cotizaciones ya tenga spread y brecha calculados.
+function agregarSenial(cotizaciones) {
+  const seniales = obtenerSenial(cotizaciones)
+  return cotizaciones.map((c, i) => ({ ...c, senial: seniales[i].senial }))
+}
+
 // Si tipos es un array vacío o undefined, devuelve todas las cotizaciones sin filtrar
 function filtrarPorTipos(cotizaciones, tipos) {
   if (!tipos || tipos.length === 0) return cotizaciones
   return cotizaciones.filter(c => tipos.includes(c.casa))
 }
 
-module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenial, filtrarPorTipos }
+module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenial, agregarSenial, filtrarPorTipos }
