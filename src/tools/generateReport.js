@@ -1,41 +1,57 @@
-const { fetchExchangeRates } = require('../infrastructure/dolarapiClient')
-const { rawACotizaciones } = require('../mappers/exchangeMapper')
-const { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenial } = require('../services/exchangeService')
+const repositorioMensaje = require('../repositories/messageRepository')
+const repositorioEjecucion = require('../repositories/toolExecutionRepository')
 
 const definicion = {
-  name: 'generate_report',
-  description: 'Genera un reporte completo del mercado cambiario argentino con todas las cotizaciones disponibles, sus spreads, brechas respecto al oficial y señales de recomendación.',
+  name: 'generate_session_report',
+  description: 'Genera un reporte de la sesión actual: total de consultas, herramientas usadas, latencia promedio, tipos de dólar consultados y errores. No llama a la API externa.',
   parameters: {
     type: 'object',
-    properties: {},
-    required: []
+    properties: {
+      conversation_id: {
+        type: 'string',
+        description: 'ID de la conversación a reportar.'
+      }
+    },
+    required: ['conversation_id']
   }
 }
 
-async function manejador() {
-  const { datos, fuente, esFallback } = await fetchExchangeRates()
-  const mapeado = rawACotizaciones(datos, fuente, esFallback)
+async function manejador({ conversation_id: idConversacion }) {
+  const [mensajes, ejecuciones] = await Promise.all([
+    repositorioMensaje.listarPorConversacion(idConversacion),
+    repositorioEjecucion.listarPorConversacion(idConversacion)
+  ])
 
-  let cotizaciones = calcularSpreads(mapeado.cotizaciones)
-  cotizaciones = calcularBrecha(cotizaciones)
-  const seniales = obtenerSenial(cotizaciones)
-  const ordenadas = ordenarParaComprar(cotizaciones)
+  const totalConsultas = mensajes.filter(m => m.role === 'user').length
 
-  const resumen = {
-    total: ordenadas.length,
-    comprar: seniales.filter(s => s.senial === 'comprar').map(s => s.nombre),
-    esperar: seniales.filter(s => s.senial === 'esperar').map(s => s.nombre),
-    neutral: seniales.filter(s => s.senial === 'neutral').map(s => s.nombre)
-  }
+  const usoHerramientas = ejecuciones.reduce((acumulador, e) => {
+    acumulador[e.tool_name] = (acumulador[e.tool_name] || 0) + 1
+    return acumulador
+  }, {})
+
+  const ejecucionesConLatencia = ejecuciones.filter(e => e.latency_ms != null)
+  const latenciaPromedio = ejecucionesConLatencia.length
+    ? Math.round(ejecucionesConLatencia.reduce((suma, e) => suma + e.latency_ms, 0) / ejecucionesConLatencia.length)
+    : null
+
+  const tiposConsultados = [...new Set(
+    ejecuciones
+      .filter(e => e.input?.rate_types?.length)
+      .flatMap(e => e.input.rate_types)
+  )]
+
+  const errores = ejecuciones
+    .filter(e => e.error)
+    .map(e => ({ herramienta: e.tool_name, error: e.error }))
 
   return {
-    cotizaciones: ordenadas,
-    seniales,
-    resumen,
-    omitidos: mapeado.omitidos,
-    advertencia: mapeado.advertencia,
-    fuente: mapeado.fuente,
-    timestamp: mapeado.timestamp
+    idConversacion,
+    totalConsultas,
+    usoHerramientas,
+    latenciaPromedioMs: latenciaPromedio,
+    tiposConsultados,
+    errores,
+    totalEjecuciones: ejecuciones.length
   }
 }
 
