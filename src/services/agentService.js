@@ -19,22 +19,65 @@ const MAX_REINTENTOS = 2
 const MAX_ITERACIONES_TOOLS = 4
 const DEMORA_BASE_MS = 1000
 
-async function llamarOpenAI(mensajes, intento = 0) {
+// Llama a OpenAI con stream:true. Acumula tool_calls de los deltas y llama onChunk
+// con cada delta de texto. OpenAI no emite texto cuando decide usar tools, así que
+// onChunk solo dispara en la iteración final que devuelve respuesta de texto.
+async function llamarOpenAI(mensajes, onChunk, intento = 0) {
+  let flujo
   try {
-    return await clienteOpenAI.chat.completions.create({
+    flujo = await clienteOpenAI.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: mensajes,
       tools: DEFINICIONES_HERRAMIENTAS,
-      tool_choice: 'auto'
+      tool_choice: 'auto',
+      stream: true
     })
   } catch (err) {
     if (err.status === 429 && intento < MAX_REINTENTOS) {
       const demora = DEMORA_BASE_MS * Math.pow(2, intento)
       await new Promise(res => setTimeout(res, demora))
-      return llamarOpenAI(mensajes, intento + 1)
+      return llamarOpenAI(mensajes, onChunk, intento + 1)
     }
     throw err
   }
+
+  let contenidoTexto = ''
+  const mapaToolCalls = {}
+
+  for await (const chunk of flujo) {
+    const delta = chunk.choices[0]?.delta
+    if (!delta) continue
+
+    if (delta.content) {
+      contenidoTexto += delta.content
+      onChunk?.(delta.content)
+    }
+
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        if (!mapaToolCalls[tc.index]) {
+          mapaToolCalls[tc.index] = {
+            id: tc.id,
+            type: 'function',
+            function: { name: tc.function?.name ?? '', arguments: '' }
+          }
+        }
+        if (tc.function?.arguments) {
+          mapaToolCalls[tc.index].function.arguments += tc.function.arguments
+        }
+      }
+    }
+  }
+
+  const toolCalls = Object.values(mapaToolCalls)
+
+  const mensajeAsistente = {
+    role: 'assistant',
+    content: contenidoTexto || null,
+    ...(toolCalls.length ? { tool_calls: toolCalls } : {})
+  }
+
+  return { mensajeAsistente, toolCalls }
 }
 
 async function ejecutarHerramienta(llamada, idConversacion) {
@@ -78,7 +121,7 @@ async function ejecutarHerramienta(llamada, idConversacion) {
   }
 }
 
-async function chat(idConversacion, mensajeUsuario) {
+async function chat(idConversacion, mensajeUsuario, onChunk) {
   if (!idConversacion) {
     const conversacion = await servicioSesion.crearConversacion()
     idConversacion = conversacion.id
@@ -93,17 +136,16 @@ async function chat(idConversacion, mensajeUsuario) {
   let iteracion = 0
 
   while (iteracion < MAX_ITERACIONES_TOOLS) {
-    const respuesta = await llamarOpenAI(mensajes)
-    const mensajeAsistente = respuesta.choices[0].message
+    const { mensajeAsistente, toolCalls } = await llamarOpenAI(mensajes, onChunk)
     iteracion++
 
-    if (!mensajeAsistente.tool_calls?.length) {
+    if (!toolCalls.length) {
       respuestaFinal = mensajeAsistente.content
       break
     }
 
     const resultadosHerramientas = await Promise.all(
-      mensajeAsistente.tool_calls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
+      toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
     )
 
     mensajes = [...mensajes, mensajeAsistente, ...resultadosHerramientas]
