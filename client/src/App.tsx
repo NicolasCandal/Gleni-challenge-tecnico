@@ -4,7 +4,13 @@ import { MessageInput } from './components/MessageInput'
 import { ToolPanel } from './components/ToolPanel'
 
 export default function App() {
-  const { mensajes, cargando, error, conversationId, enviar } = useChat()
+  const { mensajes, cargando, error, errorStatus, conversationId, enviar } = useChat()
+
+  const bannerError = error ? (() => {
+    if (errorStatus === 429) return { clase: 'bg-yellow-50 border-yellow-300 text-yellow-800', icono: '⏱' }
+    if (errorStatus === 503) return { clase: 'bg-orange-50 border-orange-300 text-orange-800', icono: '⚠️' }
+    return { clase: 'bg-red-50 border-red-200 text-red-600', icono: '✕' }
+  })() : null
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -16,9 +22,10 @@ export default function App() {
 
         <ChatWindow mensajes={mensajes} />
 
-        {error && (
-          <div className="mx-4 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
-            {error}
+        {error && bannerError && (
+          <div className={`mx-4 mb-2 px-3 py-2 border rounded-lg text-xs flex items-center gap-2 ${bannerError.clase}`}>
+            <span>{bannerError.icono}</span>
+            <span>{error}</span>
           </div>
         )}
 

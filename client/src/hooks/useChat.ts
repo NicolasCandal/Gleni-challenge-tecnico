@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { fetchStream } from '../services/api'
+import { fetchStream, HttpError } from '../services/api'
 
 export type Rol = 'user' | 'assistant'
 
@@ -13,6 +13,7 @@ export interface EstadoChat {
   mensajes: Mensaje[]
   cargando: boolean
   error: string | null
+  errorStatus: number | null
   conversationId: string | null
   enviar: (texto: string) => Promise<void>
 }
@@ -21,12 +22,14 @@ export function useChat(): EstadoChat {
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
 
   const enviar = useCallback(async (texto: string) => {
     if (!texto.trim() || cargando) return
 
     setError(null)
+    setErrorStatus(null)
     setCargando(true)
 
     setMensajes(prev => [...prev, { rol: 'user', contenido: texto }])
@@ -56,11 +59,12 @@ export function useChat(): EstadoChat {
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : 'Error de conexión'
       setError(mensaje)
+      setErrorStatus(err instanceof HttpError ? err.status : null)
       setMensajes(prev => prev.slice(0, -1))
     } finally {
       setCargando(false)
     }
   }, [conversationId, cargando])
 
-  return { mensajes, cargando, error, conversationId, enviar }
+  return { mensajes, cargando, error, errorStatus, conversationId, enviar }
 }

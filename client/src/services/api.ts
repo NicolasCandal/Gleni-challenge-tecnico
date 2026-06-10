@@ -1,5 +1,12 @@
 const URL_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
+export class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+    this.name = 'HttpError'
+  }
+}
+
 export type EventoSSE =
   | { tipo: 'chunk'; texto: string }
   | { tipo: 'fin'; conversationId: string }
@@ -15,6 +22,16 @@ export async function fetchStream(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...(conversationId ? { conversationId } : {}), mensaje })
   })
+
+  if (!respuesta.ok) {
+    const mensajesError: Record<number, string> = {
+      429: 'Límite de consultas alcanzado. Esperá un momento antes de volver a intentar.',
+      503: 'La API de cotizaciones no está disponible en este momento.',
+      500: 'Error interno del servidor. Intentá de nuevo en unos segundos.',
+    }
+    const mensaje = mensajesError[respuesta.status] ?? `Error inesperado (${respuesta.status})`
+    throw new HttpError(respuesta.status, mensaje)
+  }
 
   if (!respuesta.body) throw new Error('El servidor no devolvió un stream')
 
