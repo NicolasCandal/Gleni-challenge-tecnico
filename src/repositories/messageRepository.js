@@ -1,4 +1,4 @@
-const supabase = require('../config/database')
+const supabase = require('../infrastructure/supabaseClient')
 
 async function crear({ idConversacion, rol, contenido }) {
   const { data, error } = await supabase

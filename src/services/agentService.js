@@ -79,6 +79,11 @@ async function ejecutarHerramienta(llamada, idConversacion) {
 }
 
 async function chat(idConversacion, mensajeUsuario) {
+  if (!idConversacion) {
+    const conversacion = await servicioSesion.crearConversacion()
+    idConversacion = conversacion.id
+  }
+
   await servicioSesion.agregarMensaje({ idConversacion, rol: 'user', contenido: mensajeUsuario })
 
   const historial = await servicioSesion.obtenerHistorial(idConversacion)
@@ -106,7 +111,7 @@ async function chat(idConversacion, mensajeUsuario) {
 
   respuestaFinal = respuestaFinal ?? 'No pude generar una respuesta.'
   await servicioSesion.agregarMensaje({ idConversacion, rol: 'assistant', contenido: respuestaFinal })
-  return respuestaFinal
+  return { conversationId: idConversacion, respuesta: respuestaFinal }
 }
 
 module.exports = { chat }
