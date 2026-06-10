@@ -22,15 +22,18 @@ async function manejador({ rate_types } = {}) {
   const { datos, fuente, esFallback } = await fetchExchangeRates()
   const mapeado = rawACotizaciones(datos, fuente, esFallback)
 
-  let cotizaciones = filtrarPorTipos(mapeado.cotizaciones, rate_types)
-  cotizaciones = calcularSpreads(cotizaciones)
+  let cotizaciones = calcularSpreads(mapeado.cotizaciones)
   cotizaciones = calcularBrecha(cotizaciones)
   const seniales = obtenerSenial(cotizaciones)
+  cotizaciones = filtrarPorTipos(cotizaciones, rate_types)
   const ordenadas = ordenarParaComprar(cotizaciones)
+
+  const casasFiltradas = new Set(ordenadas.map(c => c.casa))
+  const senialesFiltradas = seniales.filter(s => casasFiltradas.has(s.casa))
 
   return {
     cotizaciones: ordenadas,
-    seniales,
+    seniales: senialesFiltradas,
     omitidos: mapeado.omitidos,
     advertencia: mapeado.advertencia,
     fuente: mapeado.fuente,
