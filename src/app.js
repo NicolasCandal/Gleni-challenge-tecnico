@@ -15,4 +15,8 @@ app.use('/api/sessions', sessionRoutes)
 
 app.use(errorMiddleware)
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' })
+})
+
 module.exports = app
