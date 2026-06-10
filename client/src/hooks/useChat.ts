@@ -15,6 +15,7 @@ export interface EstadoChat {
   error: string | null
   errorStatus: number | null
   conversationId: string | null
+  refreshKey: number
   enviar: (texto: string) => Promise<void>
 }
 
@@ -24,6 +25,7 @@ export function useChat(): EstadoChat {
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const enviar = useCallback(async (texto: string) => {
     if (!texto.trim() || cargando) return
@@ -46,6 +48,7 @@ export function useChat(): EstadoChat {
           })
         } else if (evento.tipo === 'fin') {
           setConversationId(evento.conversationId)
+          setRefreshKey(k => k + 1)
           setMensajes(prev => {
             const copia = [...prev]
             copia[copia.length - 1] = { ...copia[copia.length - 1], parcial: false }
@@ -66,5 +69,5 @@ export function useChat(): EstadoChat {
     }
   }, [conversationId, cargando])
 
-  return { mensajes, cargando, error, errorStatus, conversationId, enviar }
+  return { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar }
 }

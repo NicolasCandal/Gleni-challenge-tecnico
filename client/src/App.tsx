@@ -4,7 +4,7 @@ import { MessageInput } from './components/MessageInput'
 import { ToolPanel } from './components/ToolPanel'
 
 export default function App() {
-  const { mensajes, cargando, error, errorStatus, conversationId, enviar } = useChat()
+  const { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar } = useChat()
 
   const bannerError = error ? (() => {
     if (errorStatus === 429) return { clase: 'bg-yellow-50 border-yellow-300 text-yellow-800', icono: '⏱' }
@@ -32,7 +32,7 @@ export default function App() {
         <MessageInput onEnviar={enviar} deshabilitado={cargando} />
       </div>
 
-      <ToolPanel conversationId={conversationId} />
+      <ToolPanel conversationId={conversationId} refreshKey={refreshKey} />
     </div>
   )
 }

@@ -1,5 +1,23 @@
 const URL_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
+export interface EjecucionHerramienta {
+  id: string
+  tool_name: string
+  input: unknown
+  output: unknown
+  latency_ms: number
+  tokens_used: number | null
+  error: string | null
+  created_at: string
+}
+
+export async function fetchEjecuciones(conversationId: string): Promise<EjecucionHerramienta[]> {
+  const respuesta = await fetch(`${URL_BASE}/api/sessions/${conversationId}/executions`)
+  if (!respuesta.ok) return []
+  const { ejecuciones } = await respuesta.json()
+  return ejecuciones ?? []
+}
+
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
     super(message)
