@@ -30,7 +30,8 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
       messages: mensajes,
       tools: DEFINICIONES_HERRAMIENTAS,
       tool_choice: 'auto',
-      stream: true
+      stream: true,
+      stream_options: { include_usage: true }
     })
   } catch (err) {
     if (err.status === 429 && intento < MAX_REINTENTOS) {
@@ -43,8 +44,14 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
 
   let contenidoTexto = ''
   const mapaToolCalls = {}
+  let tokensUsados = null
 
   for await (const chunk of flujo) {
+    if (chunk.usage) {
+      tokensUsados = chunk.usage.total_tokens
+      continue
+    }
+
     const delta = chunk.choices[0]?.delta
     if (!delta) continue
 
@@ -77,10 +84,10 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
     ...(toolCalls.length ? { tool_calls: toolCalls } : {})
   }
 
-  return { mensajeAsistente, toolCalls }
+  return { mensajeAsistente, toolCalls, tokensUsados }
 }
 
-async function ejecutarHerramienta(llamada, idConversacion) {
+async function ejecutarHerramienta(llamada, idConversacion, tokensUsados = null) {
   const nombreHerramienta = llamada.function.name
   const inicio = Date.now()
   let entrada = null
@@ -106,6 +113,7 @@ async function ejecutarHerramienta(llamada, idConversacion) {
       entrada,
       salida,
       latenciaMs,
+      tokensUsados,
       errorMsg
     })
   } catch (errPersistencia) {
@@ -136,7 +144,7 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
   let iteracion = 0
 
   while (iteracion < MAX_ITERACIONES_TOOLS) {
-    const { mensajeAsistente, toolCalls } = await llamarOpenAI(mensajes, onChunk)
+    const { mensajeAsistente, toolCalls, tokensUsados } = await llamarOpenAI(mensajes, onChunk)
     iteracion++
 
     if (!toolCalls.length) {
@@ -145,7 +153,7 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
     }
 
     const resultadosHerramientas = await Promise.all(
-      toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
+      toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion, tokensUsados))
     )
 
     mensajes = [...mensajes, mensajeAsistente, ...resultadosHerramientas]

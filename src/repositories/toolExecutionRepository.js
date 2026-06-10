@@ -1,6 +1,6 @@
 const supabase = require('../infrastructure/supabaseClient')
 
-async function crear({ idConversacion, nombreHerramienta, entrada, salida, latenciaMs, errorMsg = null }) {
+async function crear({ idConversacion, nombreHerramienta, entrada, salida, latenciaMs, tokensUsados = null, errorMsg = null }) {
   const { data, error } = await supabase
     .from('tool_executions')
     .insert({
@@ -9,6 +9,7 @@ async function crear({ idConversacion, nombreHerramienta, entrada, salida, laten
       input: entrada,
       output: salida,
       latency_ms: latenciaMs,
+      tokens_used: tokensUsados,
       error: errorMsg
     })
     .select()

@@ -24,13 +24,13 @@ export async function fetchStream(
   })
 
   if (!respuesta.ok) {
-    const mensajesError: Record<number, string> = {
+    const mensajesPorCodigo: Record<number, string> = {
       429: 'Límite de consultas alcanzado. Esperá un momento antes de volver a intentar.',
       503: 'La API de cotizaciones no está disponible en este momento.',
       500: 'Error interno del servidor. Intentá de nuevo en unos segundos.',
     }
-    const mensaje = mensajesError[respuesta.status] ?? `Error inesperado (${respuesta.status})`
-    throw new HttpError(respuesta.status, mensaje)
+    const textoError = mensajesPorCodigo[respuesta.status] ?? `Error inesperado (${respuesta.status})`
+    throw new HttpError(respuesta.status, textoError)
   }
 
   if (!respuesta.body) throw new Error('El servidor no devolvió un stream')
