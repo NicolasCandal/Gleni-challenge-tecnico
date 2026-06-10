@@ -1,9 +1,9 @@
 const supabase = require('../config/database')
 
-async function crear({ conversationId, role, content }) {
+async function crear({ idConversacion, rol, contenido }) {
   const { data, error } = await supabase
     .from('messages')
-    .insert({ conversation_id: conversationId, role, content })
+    .insert({ conversation_id: idConversacion, role: rol, content: contenido })
     .select()
     .single()
 
@@ -11,11 +11,11 @@ async function crear({ conversationId, role, content }) {
   return data
 }
 
-async function listarPorConversacion(conversationId) {
+async function listarPorConversacion(idConversacion) {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
-    .eq('conversation_id', conversationId)
+    .eq('conversation_id', idConversacion)
     .order('created_at', { ascending: true })
 
   if (error) throw error

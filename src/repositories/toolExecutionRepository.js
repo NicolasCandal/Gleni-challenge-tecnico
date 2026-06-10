@@ -1,28 +1,28 @@
 const supabase = require('../config/database')
 
-async function crear({ conversationId, toolName, input, output, latencyMs, error = null }) {
-  const { data, errorDb } = await supabase
+async function crear({ idConversacion, nombreHerramienta, entrada, salida, latenciaMs, errorMsg = null }) {
+  const { data, error } = await supabase
     .from('tool_executions')
     .insert({
-      conversation_id: conversationId,
-      tool_name: toolName,
-      input,
-      output,
-      latency_ms: latencyMs,
-      error
+      conversation_id: idConversacion,
+      tool_name: nombreHerramienta,
+      input: entrada,
+      output: salida,
+      latency_ms: latenciaMs,
+      error: errorMsg
     })
     .select()
     .single()
 
-  if (errorDb) throw errorDb
+  if (error) throw error
   return data
 }
 
-async function listarPorConversacion(conversationId) {
+async function listarPorConversacion(idConversacion) {
   const { data, error } = await supabase
     .from('tool_executions')
     .select('*')
-    .eq('conversation_id', conversationId)
+    .eq('conversation_id', idConversacion)
     .order('created_at', { ascending: true })
 
   if (error) throw error
