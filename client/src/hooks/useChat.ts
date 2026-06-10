@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { fetchStream, HttpError } from '../services/api'
+import { useState, useCallback, useEffect } from 'react'
+import { fetchStream, fetchMensajes, HttpError } from '../services/api'
 
 export type Rol = 'user' | 'assistant'
 
@@ -19,13 +19,34 @@ export interface EstadoChat {
   enviar: (texto: string) => Promise<void>
 }
 
+const CLAVE_CONVERSATION_ID = 'asesor_conversation_id'
+
 export function useChat(): EstadoChat {
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(
+    () => localStorage.getItem(CLAVE_CONVERSATION_ID)
+  )
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // Al montar, si hay una conversación guardada, recuperar su historial
+  useEffect(() => {
+    if (!conversationId) return
+
+    fetchMensajes(conversationId).then(filas => {
+      if (filas.length === 0) return
+      setMensajes(filas.map(f => ({ rol: f.role, contenido: f.content })))
+      setRefreshKey(k => k + 1)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const guardarConversationId = (id: string) => {
+    setConversationId(id)
+    localStorage.setItem(CLAVE_CONVERSATION_ID, id)
+  }
 
   const enviar = useCallback(async (texto: string) => {
     if (!texto.trim() || cargando) return
@@ -47,7 +68,7 @@ export function useChat(): EstadoChat {
             return copia
           })
         } else if (evento.tipo === 'fin') {
-          setConversationId(evento.conversationId)
+          guardarConversationId(evento.conversationId)
           setRefreshKey(k => k + 1)
           setMensajes(prev => {
             const copia = [...prev]

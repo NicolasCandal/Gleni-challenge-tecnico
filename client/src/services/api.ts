@@ -18,6 +18,19 @@ export async function fetchEjecuciones(conversationId: string): Promise<Ejecucio
   return ejecuciones ?? []
 }
 
+export interface MensajeDTO {
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
+
+export async function fetchMensajes(conversationId: string): Promise<MensajeDTO[]> {
+  const respuesta = await fetch(`${URL_BASE}/api/sessions/${conversationId}/messages`)
+  if (!respuesta.ok) return []
+  const { mensajes } = await respuesta.json()
+  return mensajes ?? []
+}
+
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
     super(message)
