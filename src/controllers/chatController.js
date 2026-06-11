@@ -25,7 +25,7 @@ async function chat(req, res, next) {
     enviarEvento({ tipo: 'fin', conversationId: resultado.conversationId, assistantMessageId: resultado.assistantMessageId })
     res.end()
   } catch (err) {
-    enviarEvento({ tipo: 'error', mensaje: err.message || 'Error interno del servidor' })
+    enviarEvento({ tipo: 'error', mensaje: err.message || 'Error interno del servidor', status: err.status || 500 })
     res.end()
   }
 }

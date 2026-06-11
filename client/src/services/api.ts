@@ -45,7 +45,7 @@ export type EventoSSE =
   | { tipo: 'chunk'; texto: string }
   | { tipo: 'fin'; conversationId: string; assistantMessageId?: string }
   | { tipo: 'usage'; tokens: number }
-  | { tipo: 'error'; mensaje: string }
+  | { tipo: 'error'; mensaje: string; status?: number }
 
 export type FeedbackValor = 'up' | 'down'
 

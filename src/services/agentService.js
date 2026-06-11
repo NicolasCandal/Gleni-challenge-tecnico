@@ -22,7 +22,7 @@ const DEMORA_BASE_MS = 1000
 // Llama a OpenAI con stream:true. Acumula tool_calls de los deltas y llama onChunk
 // con cada delta de texto. OpenAI no emite texto cuando decide usar tools, así que
 // onChunk solo dispara en la iteración final que devuelve respuesta de texto.
-async function llamarOpenAI(mensajes, onChunk, intento = 0) {
+async function llamarOpenAI(mensajes, onChunk, intento = 0, tokensBase = 0) {
   let flujo
   try {
     flujo = await clienteOpenAI.chat.completions.create({
@@ -37,7 +37,7 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
     if (err.status === 429 && intento < MAX_REINTENTOS) {
       const demora = DEMORA_BASE_MS * Math.pow(2, intento)
       await new Promise(res => setTimeout(res, demora))
-      return llamarOpenAI(mensajes, onChunk, intento + 1)
+      return llamarOpenAI(mensajes, onChunk, intento + 1, tokensBase)
     }
     throw err
   }
@@ -45,13 +45,12 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
   let contenidoTexto = ''
   const mapaToolCalls = {}
   let tokensUsados = null
-  let tokensEstimados = 0
+  let tokensEstimados = tokensBase
 
   for await (const chunk of flujo) {
     if (chunk.usage) {
       tokensUsados = chunk.usage.total_tokens
-      // Emitir evento de uso para que el controller lo reenvíe al cliente en tiempo real
-      onChunk?.({ tipo: 'usage', tokens: tokensUsados })
+      onChunk?.({ tipo: 'usage', tokens: tokensBase + tokensUsados })
       continue
     }
 
@@ -60,14 +59,11 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
 
     if (delta.content) {
       contenidoTexto += delta.content
-      // Emitir el fragmento de texto al cliente
       onChunk?.(delta.content)
-      // Estimar tokens por el fragmento recibido (heurística: 1 token ≈ 4 caracteres)
       try {
         const chars = delta.content.length || 0
         const incremento = Math.max(1, Math.ceil(chars / 4))
         tokensEstimados += incremento
-        // Enviar estimación en vivo (será reemplazada si OpenAI reporta usage real)
         onChunk?.({ tipo: 'usage', tokens: tokensEstimados })
       } catch (e) {
         // no bloquear por errores de estimación
@@ -159,9 +155,10 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
 
   let respuestaFinal = null
   let iteracion = 0
+  let tokensAcumulados = 0
 
   while (iteracion < MAX_ITERACIONES_TOOLS) {
-    const { mensajeAsistente, toolCalls, tokensUsados } = await llamarOpenAI(mensajes, onChunk)
+    const { mensajeAsistente, toolCalls, tokensUsados } = await llamarOpenAI(mensajes, onChunk, 0, tokensAcumulados)
     iteracion++
 
     if (!toolCalls.length) {
@@ -189,6 +186,7 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
     )
 
     if (tokensUsados) {
+      tokensAcumulados += tokensUsados
       try {
         await repositorioEjecucion.crear({
           idConversacion,

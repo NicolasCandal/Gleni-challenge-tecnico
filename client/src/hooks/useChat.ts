@@ -91,6 +91,7 @@ export function useChat(): EstadoChat {
           })
         } else if (evento.tipo === 'error') {
           setError(evento.mensaje)
+          setErrorStatus(evento.status ?? null)
           setMensajes(prev => prev.slice(0, -1))
         }
       })
