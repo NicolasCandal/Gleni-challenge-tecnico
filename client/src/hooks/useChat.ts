@@ -15,6 +15,8 @@ export interface Mensaje {
 export interface EstadoChat {
   mensajes: Mensaje[]
   cargando: boolean
+  cargandoConversation: boolean
+  tokensLive: number | null
   error: string | null
   errorStatus: number | null
   conversationId: string | null

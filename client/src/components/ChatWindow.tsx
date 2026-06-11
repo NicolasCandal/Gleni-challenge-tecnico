@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Box, Typography } from '@mui/material'
 import { MessageBubble } from './MessageBubble'
 import type { Mensaje, FeedbackValor } from '../hooks/useChat'
 
@@ -15,16 +16,29 @@ export function ChatWindow({ mensajes, onFeedback }: Props) {
   }, [mensajes])
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+    <Box
+      component="section"
+      sx={{ flex: 1, overflowY: 'auto', px: 2, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}
+      role="region"
+      aria-label="Historial de chat"
+      aria-live="polite"
+      aria-relevant="additions"
+    >
       {mensajes.length === 0 && (
-        <p className="text-center text-gray-400 dark:text-gray-500 text-sm mt-8">
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          align="center"
+          sx={{ mt: 8 }}
+          role="status"
+        >
           Preguntale al Asesor sobre cotizaciones del dólar
-        </p>
+        </Typography>
       )}
       {mensajes.map((m, i) => (
         <MessageBubble key={m.id ?? i} mensaje={m} onFeedback={onFeedback} />
       ))}
-      <div ref={bottomRef} />
-    </div>
+      <div ref={bottomRef} aria-hidden="true" />
+    </Box>
   )
 }

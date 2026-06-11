@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Box, TextField, Button } from '@mui/material'
 
 interface Props {
   onEnviar: (texto: string) => void
@@ -7,10 +8,10 @@ interface Props {
 
 export function MessageInput({ onEnviar, deshabilitado }: Props) {
   const [texto, setTexto] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!deshabilitado) textareaRef.current?.focus()
+    if (!deshabilitado) inputRef.current?.focus()
   }, [deshabilitado])
 
   const enviar = () => {
@@ -19,7 +20,7 @@ export function MessageInput({ onEnviar, deshabilitado }: Props) {
     setTexto('')
   }
 
-  const manejarTecla = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const manejarTecla = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       enviar()
@@ -27,35 +28,49 @@ export function MessageInput({ onEnviar, deshabilitado }: Props) {
   }
 
   return (
-    <div className="flex gap-2 items-end p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-      <textarea
-        ref={textareaRef}
+    <Box
+      component="footer"
+      sx={{
+        display: 'flex',
+        gap: 1,
+        alignItems: 'flex-end',
+        p: 2,
+        borderTop: 1,
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+      }}
+    >
+      <TextField
+        inputRef={inputRef}
         value={texto}
         onChange={e => setTexto(e.target.value)}
         onKeyDown={manejarTecla}
         disabled={deshabilitado}
         placeholder="Escribí tu consulta... (Enter para enviar)"
-        rows={1}
-        className="flex-1 resize-none rounded-xl border border-gray-300 dark:border-gray-600
-          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-          placeholder-gray-400 dark:placeholder-gray-500
-          px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500
-          disabled:opacity-50 disabled:cursor-not-allowed max-h-32 overflow-y-auto"
-        style={{ height: 'auto' }}
-        onInput={e => {
-          const t = e.currentTarget
-          t.style.height = 'auto'
-          t.style.height = `${t.scrollHeight}px`
+        multiline
+        maxRows={4}
+        size="small"
+        fullWidth
+        slotProps={{
+          htmlInput: {
+            'aria-label': 'Campo de entrada para consultas',
+            'aria-describedby': 'textarea-help',
+          },
         }}
+        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
       />
-      <button
+      <span id="textarea-help" className="sr-only">
+        Presiona Enter para enviar tu consulta, Shift+Enter para nueva línea
+      </span>
+      <Button
+        variant="contained"
         onClick={enviar}
         disabled={deshabilitado || !texto.trim()}
-        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white
-          hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        aria-label="Enviar consulta"
+        sx={{ borderRadius: '12px', px: 2, py: 1, flexShrink: 0, textTransform: 'none' }}
       >
         Enviar
-      </button>
-    </div>
+      </Button>
+    </Box>
   )
 }
