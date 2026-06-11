@@ -56,17 +56,53 @@ Cliente (React + Vite)
 ┌──────────────────────────────────────────────────────┐
 │                    Supabase (PostgreSQL)              │
 │                                                      │
-│  conversations   messages   tool_executions          │
-│  ─────────────   ────────   ────────────────         │
-│  id (uuid)       id         id                       │
-│  created_at      conv_id    conv_id                  │
-│                  role       tool_name                 │
-│                  content    input (jsonb)             │
+│  conversations   messages   tool_executions   feedback│
+│  ─────────────   ────────   ────────────────   ───────│
+│  id (uuid)       id         id                id      │
+│  created_at      conv_id    conv_id           message_id│
+│                  role       tool_name         feedback │
+│                  content    input (jsonb)     created_at│
 │                  created_at output (jsonb)            │
 │                             latency_ms               │
 │                             tokens_used              │
 │                             error                    │
 │                             created_at               │
+└──────────────────────────────────────────────────────┘
+```
+
+## Flujo de feedback de mensajes
+
+```
+Cliente (React + Vite)
+        │
+        │  POST /api/messages/:id/feedback { feedback: 'up' | 'down' }
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│                         Express App                         │
+│                                                             │
+│  validar(EsquemaFeedback) — Zod middleware                  │
+│        │                                                    │
+│  messageController.registrarFeedback()                      │
+└────────┼────────────────────────────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────────────────────────────────────────┐
+│                    messageFeedbackRepository                   │
+│                                                                │
+│  upsert feedback by messageId                                  │
+│  join/hydrate feedback when listing messages                   │
+└────────┼──────────────────────────────────────────────────────┘
+         │
+         ▼
+┌──────────────────────────────────────────────────────┐
+│                    Supabase (PostgreSQL)              │
+│                                                      │
+│  feedback                                             │
+│  ────────                                             │
+│  id (uuid)                                             │
+│  message_id (uuid)                                     │
+│  feedback ('up' | 'down')                              │
+│  created_at                                            │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -90,6 +126,7 @@ Cliente (React + Vite)
 ```
 GET  /api/health                     → healthcheck
 POST /api/chat                       → chat SSE (rate limited)
+POST /api/messages/:id/feedback      → guardar feedback de un mensaje
 GET  /api/sessions/:id/messages      → historial de mensajes
 GET  /api/sessions/:id/executions    → ejecuciones de herramientas
 ```

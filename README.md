@@ -29,10 +29,10 @@ Personas que necesitan comprar o vender dólares en Argentina y quieren entender
     - [ ] La respuesta incluye una recomendación clara entre comprar, esperar o neutral.
     - [ ] La consulta queda persistida en el historial de la sesión.
 
-2. **Como usuario que sigue el mercado**, quiero poder preguntar "¿cómo está la brecha hoy comparada con la semana pasada?" y recibir un análisis en lenguaje natural, para entender el contexto sin interpretar números crudos.
+2. **Como usuario que sigue el mercado**, quiero poder preguntar "¿cómo está la brecha hoy y qué tipo de cambio conviene?" y recibir un análisis en lenguaje natural, para entender el contexto sin interpretar números crudos.
 
-    - [ ] El asistente explica la brecha en lenguaje natural.
-    - [ ] La respuesta compara el valor actual con el tipo oficial.
+    - [ ] El asistente explica la brecha contra el dólar oficial en lenguaje natural.
+    - [ ] La respuesta compara los distintos tipos de cambio disponibles.
     - [ ] El resultado conserva el contexto de la conversación.
 
 3. **Como usuario que usa el chat con frecuencia**, quiero que el asistente recuerde la conversación de la sesión actual y pueda generarme un resumen de lo que consulté, para tener un registro de mis interacciones sin tener que repetir contexto.
@@ -46,8 +46,14 @@ Personas que necesitan comprar o vender dólares en Argentina y quieren entender
 - Streaming SSE en el chat para mostrar la respuesta del asistente de forma incremental.
 - Testing unitario y E2E para validar la lógica de negocio y el flujo de la API.
 - Rate limiting en `/api/chat` para evitar abuso y proteger el backend.
+- Sistema de Feedback para calificar respuestas con pulgar arriba/abajo y persistir la señal en Supabase.
 - Observabilidad con logging de tools, incluyendo latencia y tokens por ejecución.
 - Panel lateral de invocaciones para inspeccionar herramientas, payloads y resultados de cada turno.
+
+## Mapeo de capacidades LLM del enunciado
+
+- **Capacidad b:** responder consultas sobre cotizaciones y comparaciones del mercado, usando `get_exchange_rates` para normalizar datos, calcular brecha/spread y devolver una recomendación clara.
+- **Capacidad c:** generar un resumen o reporte de la sesión, usando `generate_session_report` para condensar el historial conversacional y persistir una salida útil.
 
 ## ¿Por qué estas tools/APIs?
 
@@ -132,7 +138,8 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 ```
 ├── api/              → entrypoint para Vercel (importa src/app.js)
 ├── client/           → frontend React + TypeScript
-├── docs/             → architecture.md, .env.example
+├── docs/             → architecture.md
+├── .env.example      → variables de entorno de referencia
 ├── src/
 │   ├── app.js
 │   ├── controllers/
@@ -162,7 +169,7 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 ## Configuración local
 
 1. Clonar el repositorio.
-2. Copiar `.env.example` a `src/.env` y completar las variables.
+2. Copiar `.env.example` de la raíz del repo a `src/.env` y completar las variables.
 3. Instalar dependencias del backend: `npm install`
 4. Instalar dependencias del frontend: `cd client && npm install`
 5. Iniciar el backend: `npm run dev`
@@ -172,7 +179,7 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 
 1. Crear o abrir el proyecto en Vercel y vincular el repositorio.
 2. Ir a `Settings` → `Environment Variables`.
-3. Tomar como referencia el archivo `.env.example` del proyecto.
+3. Tomar como referencia el archivo `.env.example` ubicado en la raíz del proyecto.
 4. Crear una variable por cada clave del ejemplo y pegar su valor correspondiente.
 5. Guardar los cambios y volver a desplegar el proyecto para que Vercel aplique las nuevas env vars.
 6. Verificar el deploy público y probar el chat con una consulta simple.
