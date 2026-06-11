@@ -109,6 +109,12 @@ Por eso `get_exchange_rates` devuelve dos valores cuando se pasa un monto: `refe
 
 **Trade-off:** la respuesta es más compleja, pero elimina la ambigüedad y habilita al agente a diferenciar entre una consulta informativa y una operacional.
 
+### Triple sistema de theming en el frontend
+
+El frontend combina tres capas de estilo: **MUI ThemeProvider** (paleta `dark`/`light` para componentes MUI), **clases `dark:` de Tailwind** (activadas por la clase `dark` en `<html>`) y **prop `sx`** para overrides puntuales. Ambos sistemas se sincronizan a través del hook `useDarkMode` en `App.tsx`, que al cambiar el estado activa tanto la clase en el DOM como recrea el tema de MUI.
+
+**Trade-off:** depurar un problema visual requiere revisar tres lugares: la paleta del tema, las clases Tailwind y los `sx` del componente. El triple sistema surgió de agregar MUI sobre una base Tailwind existente en lugar de migrar completamente; una reescritura a un único sistema (solo MUI con `sx`/`styled`, o solo Tailwind) eliminaría la ambigüedad pero implicaría refactorizar todos los componentes.
+
 ### Rate limiting en el endpoint de chat
 
 Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP directamente en la ruta `/api/chat`. El mensaje de error es legible por el usuario.

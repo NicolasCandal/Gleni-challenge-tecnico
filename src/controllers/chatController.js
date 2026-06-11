@@ -3,7 +3,6 @@ const servicioAgente = require('../services/agentService')
 async function chat(req, res, next) {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('Connection', 'keep-alive')
 
   const enviarEvento = (payload) => {
     res.write(`data: ${JSON.stringify(payload)}\n\n`)

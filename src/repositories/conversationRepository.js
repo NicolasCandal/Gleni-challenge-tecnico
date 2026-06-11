@@ -11,15 +11,4 @@ async function crear() {
   return data
 }
 
-async function buscarPorId(id) {
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-module.exports = { crear, buscarPorId }
+module.exports = { crear }
