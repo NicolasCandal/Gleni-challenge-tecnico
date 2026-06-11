@@ -4,6 +4,7 @@ import { fetchEjecuciones, EjecucionHerramienta } from '../services/api'
 interface Props {
   conversationId: string | null
   refreshKey: number
+  tokensLive?: number | null
 }
 
 function PayloadColapsable({ label, datos }: { label: string; datos: unknown }) {
@@ -65,7 +66,7 @@ function TarjetaEjecucion({ ejec }: { ejec: EjecucionHerramienta }) {
   )
 }
 
-export function ToolPanel({ conversationId, refreshKey }: Props) {
+export function ToolPanel({ conversationId, refreshKey, tokensLive }: Props) {
   const [abierto, setAbierto] = useState(true)
   const [ejecuciones, setEjecuciones] = useState<EjecucionHerramienta[]>([])
 
@@ -87,7 +88,7 @@ export function ToolPanel({ conversationId, refreshKey }: Props) {
     <div className={`flex flex-col border-l border-gray-200 dark:border-gray-700 ${bgClass} dark:bg-gray-900 transition-all duration-300 ${abierto ? 'w-72' : 'w-10'}`}>
       <button
         onClick={() => setAbierto(p => !p)}
-        className="flex items-center justify-center h-10 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+        className="flex items-center justify-center h-10 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
         title={abierto ? 'Cerrar panel' : 'Abrir panel'}
       >
         {abierto ? '›' : '‹'}
@@ -98,6 +99,9 @@ export function ToolPanel({ conversationId, refreshKey }: Props) {
           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             Herramientas
           </p>
+          {tokensLive != null && (
+            <div className="text-xs text-gray-400 dark:text-gray-300 mb-2">Tokens (live): <span className="font-medium text-gray-700 dark:text-gray-100">{tokensLive}</span></div>
+          )}
 
           {!conversationId && (
             <p className="text-xs text-gray-400 dark:text-gray-500 italic">Sin conversación activa</p>

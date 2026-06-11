@@ -16,7 +16,7 @@ function useDarkMode() {
 }
 
 export default function App() {
-  const { mensajes, cargando, cargandoConversation, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear } = useChat()
+  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear } = useChat()
   const { dark, toggle } = useDarkMode()
 
   const bannerError = error ? (() => {
@@ -71,7 +71,7 @@ export default function App() {
         <MessageInput onEnviar={enviar} deshabilitado={cargando} />
       </div>
 
-      <ToolPanel conversationId={conversationId} refreshKey={refreshKey} />
+      <ToolPanel conversationId={conversationId} refreshKey={refreshKey} tokensLive={tokensLive} />
 
       {cargandoConversation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">

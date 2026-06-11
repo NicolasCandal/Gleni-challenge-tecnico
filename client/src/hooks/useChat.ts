@@ -35,6 +35,7 @@ export function useChat(): EstadoChat {
   const [conversationId, setConversationId] = useState<string | null>(
     () => localStorage.getItem(CLAVE_CONVERSATION_ID)
   )
+  const [tokensLive, setTokensLive] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
   // Al montar, si hay una conversación guardada, recuperar su historial
@@ -64,6 +65,8 @@ export function useChat(): EstadoChat {
 
     setMensajes(prev => [...prev, { rol: 'user', contenido: texto }])
     setMensajes(prev => [...prev, { rol: 'assistant', contenido: '', parcial: true, feedback: null }])
+    // Inicializar contador de tokens en cuanto se envía la consulta
+    setTokensLive(0)
 
     try {
       await fetchStream(conversationId, texto, (evento) => {
@@ -74,6 +77,8 @@ export function useChat(): EstadoChat {
             copia[copia.length - 1] = { ...ultimo, contenido: ultimo.contenido + evento.texto }
             return copia
           })
+        } else if (evento.tipo === 'usage') {
+          setTokensLive(evento.tokens)
         } else if (evento.tipo === 'fin') {
           guardarConversationId(evento.conversationId)
           setRefreshKey(k => k + 1)
@@ -92,6 +97,8 @@ export function useChat(): EstadoChat {
       setError(mensaje)
       setErrorStatus(err instanceof HttpError ? err.status : null)
       setMensajes(prev => prev.slice(0, -1))
+      // Al fallar la petición, limpiar el contador en vivo
+      setTokensLive(null)
     } finally {
       setCargando(false)
     }
@@ -123,5 +130,5 @@ export function useChat(): EstadoChat {
     }
   }, [mensajes])
 
-  return { mensajes, cargando, cargandoConversation, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear }
+  return { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear }
 }

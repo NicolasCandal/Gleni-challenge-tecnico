@@ -45,10 +45,13 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
   let contenidoTexto = ''
   const mapaToolCalls = {}
   let tokensUsados = null
+  let tokensEstimados = 0
 
   for await (const chunk of flujo) {
     if (chunk.usage) {
       tokensUsados = chunk.usage.total_tokens
+      // Emitir evento de uso para que el controller lo reenvíe al cliente en tiempo real
+      onChunk?.({ tipo: 'usage', tokens: tokensUsados })
       continue
     }
 
@@ -57,7 +60,18 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
 
     if (delta.content) {
       contenidoTexto += delta.content
+      // Emitir el fragmento de texto al cliente
       onChunk?.(delta.content)
+      // Estimar tokens por el fragmento recibido (heurística: 1 token ≈ 4 caracteres)
+      try {
+        const chars = delta.content.length || 0
+        const incremento = Math.max(1, Math.ceil(chars / 4))
+        tokensEstimados += incremento
+        // Enviar estimación en vivo (será reemplazada si OpenAI reporta usage real)
+        onChunk?.({ tipo: 'usage', tokens: tokensEstimados })
+      } catch (e) {
+        // no bloquear por errores de estimación
+      }
     }
 
     if (delta.tool_calls) {

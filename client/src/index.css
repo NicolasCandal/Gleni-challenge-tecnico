@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Scrollbar styling for textarea to match dark mode */
+html.dark textarea::-webkit-scrollbar {
+  width: 14px;
+  background: #2d3748; /* gray-800 */
+}
+html.dark textarea::-webkit-scrollbar-track {
+  background: #2d3748; /* gray-800 */
+}
+html.dark textarea::-webkit-scrollbar-thumb {
+  background: #4a5568; /* gray-600 */
+  border-radius: 8px;
+}
+html.dark textarea::-webkit-scrollbar-button {
+  background: #2d3748; /* gray-800 */
+}
+
+/* Firefox */
+html.dark textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #2d3748;
+}
+
+/* Light mode adjustments to avoid white box on light theme */
+html textarea::-webkit-scrollbar {
+  background: #f8fafc; /* gray-50 */
+}
+html textarea::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* gray-300 */
+}
+html textarea::-webkit-scrollbar-button {
+  background: #f8fafc;
+}

@@ -12,7 +12,13 @@ async function chat(req, res, next) {
   try {
     const { conversationId, mensaje } = req.body
 
-    const onChunk = (texto) => enviarEvento({ tipo: 'chunk', texto })
+    const onChunk = (payload) => {
+      if (typeof payload === 'string') {
+        enviarEvento({ tipo: 'chunk', texto: payload })
+      } else if (payload && payload.tipo === 'usage') {
+        enviarEvento({ tipo: 'usage', tokens: payload.tokens })
+      }
+    }
 
     const resultado = await servicioAgente.chat(conversationId ?? null, mensaje, onChunk)
 
