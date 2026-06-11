@@ -78,4 +78,37 @@ describe('obtenerSenial', () => {
     expect(resultado[0].senial).toBe('comprar')
     expect(resultado[1].senial).toBe('esperar')
   })
+
+  // Sin tipo oficial en el conjunto, calcularBrecha pone brecha: null en todos.
+  // null coerce a 0 en comparaciones numéricas de JS: `null < BRECHA_BAJA` es true,
+  // lo que haría disparar 'comprar' aunque no haya referencia. El guard `brecha !== null`
+  // en la condición de 'comprar' evita ese falso positivo.
+  describe('brecha: null (sin tipo oficial de referencia)', () => {
+    test('no devuelve "comprar" aunque el spread sea bajo', () => {
+      const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 1.0, brecha: null }]
+      const [resultado] = obtenerSenial(cotizaciones)
+      expect(resultado.senial).not.toBe('comprar')
+    })
+
+    test('devuelve "neutral" con spread bajo y brecha null', () => {
+      const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 1.0, brecha: null }]
+      const [resultado] = obtenerSenial(cotizaciones)
+      expect(resultado.senial).toBe('neutral')
+    })
+
+    test('ningún tipo devuelve "comprar" cuando todos tienen brecha null', () => {
+      const cotizaciones = [
+        { casa: 'blue',  nombre: 'Blue',  spread: 1.0, brecha: null },
+        { casa: 'bolsa', nombre: 'Bolsa', spread: 1.2, brecha: null },
+      ]
+      const resultado = obtenerSenial(cotizaciones)
+      expect(resultado.every(r => r.senial !== 'comprar')).toBe(true)
+    })
+
+    test('sí devuelve "esperar" cuando el spread es alto aunque la brecha sea null', () => {
+      const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 3.0, brecha: null }]
+      const [resultado] = obtenerSenial(cotizaciones)
+      expect(resultado.senial).toBe('esperar')
+    })
+  })
 })

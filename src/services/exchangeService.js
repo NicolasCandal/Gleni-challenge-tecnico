@@ -27,9 +27,9 @@ function obtenerSenial(cotizaciones) {
   return cotizaciones.map(c => {
     let senial
 
-    if (c.spread > UMBRALES.SPREAD_ALTO || c.brecha > UMBRALES.BRECHA_ALTA) {
+    if (c.spread > UMBRALES.SPREAD_ALTO || (c.brecha !== null && c.brecha > UMBRALES.BRECHA_ALTA)) {
       senial = 'esperar'
-    } else if (c.spread < UMBRALES.SPREAD_BAJO && c.brecha < UMBRALES.BRECHA_BAJA) {
+    } else if (c.spread < UMBRALES.SPREAD_BAJO && c.brecha !== null && c.brecha < UMBRALES.BRECHA_BAJA) {
       senial = 'comprar'
     } else {
       senial = 'neutral'
