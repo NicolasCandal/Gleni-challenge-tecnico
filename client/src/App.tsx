@@ -4,7 +4,7 @@ import { MessageInput } from './components/MessageInput'
 import { ToolPanel } from './components/ToolPanel'
 
 export default function App() {
-  const { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar } = useChat()
+  const { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, resetear } = useChat()
 
   const bannerError = error ? (() => {
     if (errorStatus === 429) return { clase: 'bg-yellow-50 border-yellow-300 text-yellow-800', icono: '⏱' }
@@ -15,9 +15,18 @@ export default function App() {
   return (
     <div className="flex h-screen bg-gray-100">
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
-          <h1 className="text-base font-semibold text-gray-800">Asesor de Cambio de Divisas</h1>
-          <p className="text-xs text-gray-400">Cotizaciones en tiempo real · dolarapi.com</p>
+        <header className="px-4 py-3 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-gray-800">Asesor de Cambio de Divisas</h1>
+            <p className="text-xs text-gray-400">Cotizaciones en tiempo real · dolarapi.com</p>
+          </div>
+          <button
+            onClick={resetear}
+            disabled={cargando}
+            className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-400 rounded-md px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Nueva conversación
+          </button>
         </header>
 
         <ChatWindow mensajes={mensajes} />

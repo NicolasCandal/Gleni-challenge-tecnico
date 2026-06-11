@@ -7,3 +7,4 @@ src/.env
 .env.local
 .env.*.local
 .vercel
+client/dist

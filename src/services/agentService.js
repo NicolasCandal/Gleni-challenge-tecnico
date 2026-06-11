@@ -99,6 +99,9 @@ async function ejecutarHerramienta(llamada, idConversacion, tokensUsados = null)
     if (!manejador) throw new Error(`herramienta desconocida: ${nombreHerramienta}`)
 
     entrada = JSON.parse(llamada.function.arguments)
+    if (nombreHerramienta === 'generate_session_report') {
+      entrada.conversation_id = idConversacion
+    }
     salida = await manejador(entrada)
   } catch (err) {
     errorMsg = err.message

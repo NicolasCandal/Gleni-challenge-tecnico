@@ -17,6 +17,7 @@ export interface EstadoChat {
   conversationId: string | null
   refreshKey: number
   enviar: (texto: string) => Promise<void>
+  resetear: () => void
 }
 
 const CLAVE_CONVERSATION_ID = 'asesor_conversation_id'
@@ -90,5 +91,14 @@ export function useChat(): EstadoChat {
     }
   }, [conversationId, cargando])
 
-  return { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar }
+  const resetear = useCallback(() => {
+    localStorage.removeItem(CLAVE_CONVERSATION_ID)
+    setConversationId(null)
+    setMensajes([])
+    setError(null)
+    setErrorStatus(null)
+    setRefreshKey(0)
+  }, [])
+
+  return { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, resetear }
 }
