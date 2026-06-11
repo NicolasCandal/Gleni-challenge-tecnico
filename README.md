@@ -23,9 +23,49 @@ Personas que necesitan comprar o vender dólares en Argentina y quieren entender
 
 1. **Como usuario que quiere comprar dólares**, quiero preguntarle al asistente "¿cuál es el mejor tipo de cambio para comprar hoy?" y recibir una respuesta clara con los valores actuales y una recomendación, para no tener que buscar en múltiples sitios.
 
+    - [ ] El asistente responde con al menos una cotización actualizada.
+    - [ ] La respuesta incluye una recomendación clara entre comprar, esperar o neutral.
+    - [ ] La consulta queda persistida en el historial de la sesión.
+
 2. **Como usuario que sigue el mercado**, quiero poder preguntar "¿cómo está la brecha hoy comparada con la semana pasada?" y recibir un análisis en lenguaje natural, para entender el contexto sin interpretar números crudos.
 
+    - [ ] El asistente explica la brecha en lenguaje natural.
+    - [ ] La respuesta compara el valor actual con el tipo oficial.
+    - [ ] El resultado conserva el contexto de la conversación.
+
 3. **Como usuario que usa el chat con frecuencia**, quiero que el asistente recuerde la conversación de la sesión actual y pueda generarme un resumen de lo que consulté, para tener un registro de mis interacciones sin tener que repetir contexto.
+
+    - [ ] El chat conserva los mensajes de la sesión actual.
+    - [ ] El asistente puede resumir lo conversado sin perder el contexto.
+    - [ ] El resumen se genera sin que el usuario repita información previa.
+
+## Features bonus implementados
+
+- Streaming SSE en el chat para mostrar la respuesta del asistente de forma incremental.
+- Testing unitario y E2E para validar la lógica de negocio y el flujo de la API.
+- Rate limiting en `/api/chat` para evitar abuso y proteger el backend.
+- Observabilidad con logging de tools, incluyendo latencia y tokens por ejecución.
+- Panel lateral de invocaciones para inspeccionar herramientas, payloads y resultados de cada turno.
+
+## ¿Por qué estas tools/APIs?
+
+- `dolarapi` porque es gratuita, no requiere API key y ofrece datos orientados al mercado argentino.
+- `bluelytics` como fallback para mantener disponibilidad cuando `dolarapi` no responde o falla.
+- `get_exchange_rates` porque encapsula la lógica de consulta, normalización y cálculo para que el agente no tenga que reconstruirla.
+- `generate_session_report` porque permite resumir la sesión y persistir una salida útil sin acoplar esa tarea al flujo principal del chat.
+
+## Diseño del prompt
+
+- Contexto de dominio: define qué significa cada tipo de cambio, cómo leer la brecha y cómo interpretar una consulta de compra, venta o comparación.
+- 7 ejemplos few-shot: cubren consulta simple, comparación de tipos, cálculo con monto, solicitud de reporte, explicación de brecha, recomendación y consulta ambigua.
+- Regla anti-invención de cifras: el modelo no puede inventar valores; debe usar únicamente los números devueltos por la tool o pedir una nueva consulta si faltan datos.
+- Política de decisión de tools: el agente debe llamar la tool correcta según la intención antes de responder, en lugar de resolver los cálculos por inferencia propia.
+- Citado de fuente obligatorio: toda respuesta con cotizaciones debe citar `dolarapi.com` como fuente primaria y mencionar el fallback solo si fue necesario.
+
+## Validación de outputs
+
+- Zod en la entrada para validar `EsquemaRateTypes` y `EsquemaChat` antes de llegar a la lógica de negocio.
+- Zod en la salida de la tool para validar `EsquemaSalidaCotizaciones` antes de exponer resultados al agente y al cliente.
 
 ## Decisiones técnicas y trade-offs
 
@@ -45,7 +85,7 @@ El controller establece el stream SSE y pasa un callback `onChunk(texto)` al `ag
 
 Los mensajes se persisten en Supabase antes de enviarle la respuesta al usuario. La inserción en `tool_executions` está en un bloque `try/catch` que solo loguea en consola para que un fallo de persistencia no interrumpa la respuesta.
 
-**Trade-off:** si Supabase falla después de que OpenAI respondió, el usuario recibe la respuesta pero el historial queda incompleto.
+**Trade-off:** si OpenAI falla después de persistir el mensaje del usuario, ese mensaje queda huérfano en la conversación; se prioriza no perder la entrada del usuario ni bloquear el flujo, aunque el historial pueda quedar incompleto hasta que se implemente una compensación/reconciliación posterior.
 
 ### Tests con guards de Supabase
 
@@ -104,9 +144,12 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
     └── generateReport.test.js
 ```
 
-## Limitaciones conocidas
+## Limitaciones conocidas y mejoras futuras
 
-**tokens_used por turno, no por tool**: OpenAI reporta el consumo de tokens a nivel de llamada al API (turno completo), sin desglose por tool call individual. Se persiste una fila `_turno` por turno con el total real; las filas de tools individuales tienen `tokens_used: null`. Mejora planeada: tabla `turn_metrics` separada en Supabase para desacoplar métricas de ejecución de tools.
+- **Tokens duplicados o inconsistentes**: hoy OpenAI reporta el consumo de tokens a nivel de turno completo, no por tool call individual. Se persiste una fila `_turno` con el total real y las filas de tools quedan con `tokens_used: null`. Mejora futura: normalizar métricas en una tabla separada (`turn_metrics`) para evitar duplicación y facilitar auditoría.
+- **Rate limit en memoria**: el límite actual vive en proceso y no se comparte entre instancias. Mejora futura: moverlo a Redis para que el control de cuota sea consistente en múltiples despliegues.
+- **Mensajes huérfanos**: si OpenAI falla después de persistir el mensaje del usuario, la conversación puede quedar incompleta. Mejora futura: agregar una estrategia de compensación/reconciliación para cerrar el turno o marcarlo explícitamente como fallido.
+- **RLS de Supabase**: la seguridad depende de la configuración del proyecto y de las credenciales del servidor. Mejora futura: reforzar políticas de Row Level Security para separar mejor acceso público, servicio y administración.
 
 ## Configuración local
 
@@ -116,6 +159,15 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 4. Instalar dependencias del frontend: `cd client && npm install`
 5. Iniciar el backend: `npm run dev`
 6. Iniciar el frontend: `cd client && npm run dev`
+
+## Deploy en Vercel
+
+1. Crear o abrir el proyecto en Vercel y vincular el repositorio.
+2. Ir a `Settings` → `Environment Variables`.
+3. Tomar como referencia el archivo `.env.example` del proyecto.
+4. Crear una variable por cada clave del ejemplo y pegar su valor correspondiente.
+5. Guardar los cambios y volver a desplegar el proyecto para que Vercel aplique las nuevas env vars.
+6. Verificar el deploy público y probar el chat con una consulta simple.
 
 ## Tests
 
