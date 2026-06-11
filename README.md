@@ -109,6 +109,12 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 
 **Trade-off:** el límite es fijo y no configurable por usuario. En producción convendría usar un store compartido (Redis) para que el límite funcione en múltiples instancias.
 
+### Nota de seguridad
+
+- **Estado de RLS en Supabase:** todas las tablas del proyecto están con RLS deshabilitado en este momento. Eso significa que no hay policies activas que limiten el acceso a nivel de fila dentro de Supabase.
+- **Anon key solo server-side:** la `SUPABASE_ANON_KEY` se usa únicamente en el backend, dentro de `src/infrastructure/supabaseClient.js`, para que el navegador nunca vea credenciales de acceso directo a la base. El frontend habla solo con nuestra API, y así evitamos exponer Supabase al cliente mientras el control de acceso siga centralizado en el servidor.
+- **Implicación práctica:** si más adelante se habilita RLS, habrá que definir policies explícitas en Supabase antes de cualquier acceso desde el cliente. Mientras tanto, la anon key no debe usarse en el frontend.
+
 ## Stack
 
 | Capa       | Tecnología                         |
@@ -151,7 +157,7 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 - **Tokens duplicados o inconsistentes**: hoy OpenAI reporta el consumo de tokens a nivel de turno completo, no por tool call individual. Se persiste una fila `_turno` con el total real y las filas de tools quedan con `tokens_used: null`. Mejora futura: normalizar métricas en una tabla separada (`turn_metrics`) para evitar duplicación y facilitar auditoría.
 - **Rate limit en memoria**: el límite actual vive en proceso y no se comparte entre instancias. Mejora futura: moverlo a Redis para que el control de cuota sea consistente en múltiples despliegues.
 - **Mensajes huérfanos**: si OpenAI falla después de persistir el mensaje del usuario, la conversación puede quedar incompleta. Mejora futura: agregar una estrategia de compensación/reconciliación para cerrar el turno o marcarlo explícitamente como fallido.
-- **RLS de Supabase**: la seguridad depende de la configuración del proyecto y de las credenciales del servidor. Mejora futura: reforzar políticas de Row Level Security para separar mejor acceso público, servicio y administración.
+- **RLS de Supabase**: hoy todas las tablas están con RLS deshabilitado. Mejora futura: habilitar RLS y versionar policies para separar mejor acceso público, servicio y administración antes de exponer acceso directo desde el cliente.
 
 ## Configuración local
 
