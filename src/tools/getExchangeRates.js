@@ -3,6 +3,8 @@ const { rawACotizaciones } = require('../mappers/exchangeMapper')
 const { calcularSpreads, calcularBrecha, ordenarParaComprar, agregarSenial, filtrarPorTipos } = require('../services/exchangeService')
 const { EsquemaRateTypes, EsquemaSalidaCotizaciones } = require('../schemas/exchangeSchema')
 
+const TIPOS_NO_OPERABLES = ['mayorista']
+
 const definicion = {
   name: 'get_exchange_rates',
   description: 'Obtiene las cotizaciones actuales del dólar en Argentina. Cada cotización incluye spread, brecha con el oficial y señal (comprar/esperar/neutral). Si se pasa amount, calcula la conversión en el servidor y devuelve dos valores: referencia (al precio de venta, el que citan los medios) y operacion (el resultado neto que recibiría/pagaría el usuario si ejecutara la transacción).',
@@ -78,7 +80,11 @@ async function manejador({ rate_types, amount, direction } = {}) {
   cotizaciones = filtrarPorTipos(cotizaciones, rate_types)
   const ordenadas = ordenarParaComprar(cotizaciones)
 
-  const conversion = amount != null ? calcularConversion(ordenadas, amount, direction) : null
+  const tieneRateTypes = Array.isArray(rate_types) && rate_types.length > 0
+  const operables = tieneRateTypes ? ordenadas : ordenadas.filter(c => !TIPOS_NO_OPERABLES.includes(c.casa))
+  const baseConversion = operables.length > 0 ? operables : ordenadas
+
+  const conversion = amount != null ? calcularConversion(baseConversion, amount, direction) : null
 
   const salida = {
     cotizaciones: ordenadas,

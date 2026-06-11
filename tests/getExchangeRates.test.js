@@ -79,6 +79,41 @@ describe('manejador — transformación correcta', () => {
   })
 })
 
+describe('manejador — guard mayorista en conversión', () => {
+  const datosConMayorista = [
+    { casa: 'mayorista', nombre: 'Mayorista', compra: 900,  venta: 950,  fechaActualizacion: '2026-01-01T00:00:00.000Z' },
+    { casa: 'oficial',   nombre: 'Oficial',   compra: 1000, venta: 1010, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
+    { casa: 'blue',      nombre: 'Blue',      compra: 1150, venta: 1200, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
+  ]
+
+  beforeEach(() => {
+    fetchExchangeRates.mockResolvedValue({ datos: datosConMayorista, fuente: 'dolarapi.com', esFallback: false })
+  })
+
+  test('conversión SIN rate_types no usa el mayorista aunque tenga venta más baja', async () => {
+    const resultado = await manejador({ amount: 100 })
+    expect(resultado.conversion.tipoUsado).not.toBe('Mayorista')
+    expect(resultado.conversion.tipoUsado).toBe('Oficial')
+  })
+
+  test('conversión CON rate_types: [mayorista] respeta la elección explícita', async () => {
+    const resultado = await manejador({ amount: 100, rate_types: ['mayorista'] })
+    expect(resultado.conversion.tipoUsado).toBe('Mayorista')
+  })
+
+  test('cotizaciones devueltas incluyen mayorista sin rate_types', async () => {
+    const resultado = await manejador({ amount: 100 })
+    const casas = resultado.cotizaciones.map(c => c.casa)
+    expect(casas).toContain('mayorista')
+  })
+
+  test('cotizaciones devueltas incluyen mayorista con rate_types: [mayorista]', async () => {
+    const resultado = await manejador({ amount: 100, rate_types: ['mayorista'] })
+    const casas = resultado.cotizaciones.map(c => c.casa)
+    expect(casas).toContain('mayorista')
+  })
+})
+
 describe('manejador — respuestas malformadas de la API', () => {
   test('filtra cotizaciones sin compra o venta en lugar de romper', async () => {
     fetchExchangeRates.mockResolvedValue({
