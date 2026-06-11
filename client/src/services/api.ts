@@ -1,4 +1,7 @@
-const URL_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+// En producción, frontend y backend viven en el mismo dominio de Vercel,
+// así que las rutas relativas ('') funcionan. Para desarrollo local, definir
+// VITE_API_URL=http://localhost:3000 en client/.env
+const URL_BASE = import.meta.env.VITE_API_URL ?? ''
 
 export interface EjecucionHerramienta {
   id: string

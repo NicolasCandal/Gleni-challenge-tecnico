@@ -6,6 +6,10 @@
     "start": "node src/server.js",
     "test": "jest"
   },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["<rootDir>/tests/**/*.test.js"]
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
     "bcryptjs": "^2.4.3",
