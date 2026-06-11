@@ -69,13 +69,22 @@ export function ToolPanel({ conversationId, refreshKey }: Props) {
   const [abierto, setAbierto] = useState(true)
   const [ejecuciones, setEjecuciones] = useState<EjecucionHerramienta[]>([])
 
+  // Evitar parpadeo blanco al recargar: leer preferencia de modo oscuro sincronamente
+  const inicialDark = typeof window !== 'undefined' && localStorage.getItem('dark_mode') === 'true'
+  const bgClass = inicialDark ? 'bg-gray-900' : 'bg-gray-50'
+
   useEffect(() => {
-    if (!conversationId) return
+    if (!conversationId) {
+      // Cuando no hay conversación activa, limpiar ejecuciones y abrir el panel
+      setEjecuciones([])
+      setAbierto(true)
+      return
+    }
     fetchEjecuciones(conversationId).then(setEjecuciones)
   }, [conversationId, refreshKey])
 
   return (
-    <div className={`flex flex-col border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 transition-all duration-300 ${abierto ? 'w-72' : 'w-10'}`}>
+    <div className={`flex flex-col border-l border-gray-200 dark:border-gray-700 ${bgClass} dark:bg-gray-900 transition-all duration-300 ${abierto ? 'w-72' : 'w-10'}`}>
       <button
         onClick={() => setAbierto(p => !p)}
         className="flex items-center justify-center h-10 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"

@@ -29,6 +29,7 @@ const CLAVE_CONVERSATION_ID = 'asesor_conversation_id'
 export function useChat(): EstadoChat {
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [cargando, setCargando] = useState(false)
+  const [cargandoConversation, setCargandoConversation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(
@@ -40,11 +41,12 @@ export function useChat(): EstadoChat {
   useEffect(() => {
     if (!conversationId) return
 
+    setCargandoConversation(true)
     fetchMensajes(conversationId).then(filas => {
       if (filas.length === 0) return
       setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
       setRefreshKey(k => k + 1)
-    })
+    }).finally(() => setCargandoConversation(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -96,12 +98,15 @@ export function useChat(): EstadoChat {
   }, [conversationId, cargando])
 
   const resetear = useCallback(() => {
+    setCargandoConversation(true)
     localStorage.removeItem(CLAVE_CONVERSATION_ID)
     setConversationId(null)
     setMensajes([])
     setError(null)
     setErrorStatus(null)
     setRefreshKey(0)
+    // Mantener el loader visible un breve momento para la transición
+    setTimeout(() => setCargandoConversation(false), 300)
   }, [])
 
   const enviarFeedback = useCallback(async (messageId: string, feedback: FeedbackValor) => {
@@ -118,5 +123,5 @@ export function useChat(): EstadoChat {
     }
   }, [mensajes])
 
-  return { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear }
+  return { mensajes, cargando, cargandoConversation, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear }
 }
