@@ -1,5 +1,5 @@
-function filaDBADto({ role, content, created_at }) {
-  return { role, content, created_at }
+function filaDBADto({ id, role, content, created_at, feedback = null }) {
+  return { id, role, content, created_at, feedback }
 }
 
 module.exports = { filaDBADto }

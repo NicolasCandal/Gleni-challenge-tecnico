@@ -138,7 +138,7 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
     idConversacion = conversacion.id
   }
 
-  await servicioSesion.agregarMensaje({ idConversacion, rol: 'user', contenido: mensajeUsuario })
+  const mensajeUsuarioGuardado = await servicioSesion.agregarMensaje({ idConversacion, rol: 'user', contenido: mensajeUsuario })
 
   const historial = await servicioSesion.obtenerHistorial(idConversacion)
   let mensajes = [{ role: 'system', content: promptSistema }, ...historial]
@@ -179,8 +179,8 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
   }
 
   respuestaFinal = respuestaFinal ?? 'No pude generar una respuesta.'
-  await servicioSesion.agregarMensaje({ idConversacion, rol: 'assistant', contenido: respuestaFinal })
-  return { conversationId: idConversacion, respuesta: respuestaFinal }
+  const mensajeAsistenteGuardado = await servicioSesion.agregarMensaje({ idConversacion, rol: 'assistant', contenido: respuestaFinal })
+  return { conversationId: idConversacion, respuesta: respuestaFinal, assistantMessageId: mensajeAsistenteGuardado.id, userMessageId: mensajeUsuarioGuardado.id }
 }
 
 module.exports = { chat }

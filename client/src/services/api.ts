@@ -20,9 +20,11 @@ export async function fetchEjecuciones(conversationId: string): Promise<Ejecucio
 }
 
 export interface MensajeDTO {
+  id: string
   role: 'user' | 'assistant'
   content: string
   created_at: string
+  feedback?: 'up' | 'down' | null
 }
 
 export async function fetchMensajes(conversationId: string): Promise<MensajeDTO[]> {
@@ -41,8 +43,23 @@ export class HttpError extends Error {
 
 export type EventoSSE =
   | { tipo: 'chunk'; texto: string }
-  | { tipo: 'fin'; conversationId: string }
+  | { tipo: 'fin'; conversationId: string; assistantMessageId?: string }
   | { tipo: 'error'; mensaje: string }
+
+export type FeedbackValor = 'up' | 'down'
+
+export async function enviarFeedbackMensaje(messageId: string, feedback: FeedbackValor): Promise<void> {
+  const respuesta = await fetch(`/api/messages/${messageId}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedback })
+  })
+
+  if (!respuesta.ok) {
+    const texto = await respuesta.text().catch(() => '')
+    throw new HttpError(respuesta.status, texto || `Error inesperado (${respuesta.status})`)
+  }
+}
 
 export async function fetchStream(
   conversationId: string | null,

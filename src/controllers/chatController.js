@@ -16,7 +16,7 @@ async function chat(req, res, next) {
 
     const resultado = await servicioAgente.chat(conversationId ?? null, mensaje, onChunk)
 
-    enviarEvento({ tipo: 'fin', conversationId: resultado.conversationId })
+    enviarEvento({ tipo: 'fin', conversationId: resultado.conversationId, assistantMessageId: resultado.assistantMessageId })
     res.end()
   } catch (err) {
     enviarEvento({ tipo: 'error', mensaje: err.message || 'Error interno del servidor' })

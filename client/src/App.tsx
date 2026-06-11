@@ -16,7 +16,7 @@ function useDarkMode() {
 }
 
 export default function App() {
-  const { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, resetear } = useChat()
+  const { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear } = useChat()
   const { dark, toggle } = useDarkMode()
 
   const bannerError = error ? (() => {
@@ -59,7 +59,7 @@ export default function App() {
           </div>
         </header>
 
-        <ChatWindow mensajes={mensajes} />
+        <ChatWindow mensajes={mensajes} onFeedback={enviarFeedback} />
 
         {error && bannerError && (
           <div className={`mx-4 mb-2 px-3 py-2 border rounded-lg text-xs flex items-center gap-2 ${bannerError.clase}`}>

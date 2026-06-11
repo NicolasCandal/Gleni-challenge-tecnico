@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { MessageBubble } from './MessageBubble'
-import type { Mensaje } from '../hooks/useChat'
+import type { Mensaje, FeedbackValor } from '../hooks/useChat'
 
 interface Props {
   mensajes: Mensaje[]
+  onFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
 }
 
-export function ChatWindow({ mensajes }: Props) {
+export function ChatWindow({ mensajes, onFeedback }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export function ChatWindow({ mensajes }: Props) {
         </p>
       )}
       {mensajes.map((m, i) => (
-        <MessageBubble key={i} mensaje={m} />
+        <MessageBubble key={m.id ?? i} mensaje={m} onFeedback={onFeedback} />
       ))}
       <div ref={bottomRef} />
     </div>

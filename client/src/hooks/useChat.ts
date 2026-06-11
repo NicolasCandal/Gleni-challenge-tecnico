@@ -1,12 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
-import { fetchStream, fetchMensajes, HttpError } from '../services/api'
+import { fetchStream, fetchMensajes, HttpError, enviarFeedbackMensaje } from '../services/api'
 
 export type Rol = 'user' | 'assistant'
+export type FeedbackValor = 'up' | 'down'
 
 export interface Mensaje {
+  id?: string
   rol: Rol
   contenido: string
   parcial?: boolean
+  feedback?: FeedbackValor | null
 }
 
 export interface EstadoChat {
@@ -17,6 +20,7 @@ export interface EstadoChat {
   conversationId: string | null
   refreshKey: number
   enviar: (texto: string) => Promise<void>
+  enviarFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
   resetear: () => void
 }
 
@@ -38,7 +42,7 @@ export function useChat(): EstadoChat {
 
     fetchMensajes(conversationId).then(filas => {
       if (filas.length === 0) return
-      setMensajes(filas.map(f => ({ rol: f.role, contenido: f.content })))
+      setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
       setRefreshKey(k => k + 1)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,7 +61,7 @@ export function useChat(): EstadoChat {
     setCargando(true)
 
     setMensajes(prev => [...prev, { rol: 'user', contenido: texto }])
-    setMensajes(prev => [...prev, { rol: 'assistant', contenido: '', parcial: true }])
+    setMensajes(prev => [...prev, { rol: 'assistant', contenido: '', parcial: true, feedback: null }])
 
     try {
       await fetchStream(conversationId, texto, (evento) => {
@@ -73,7 +77,7 @@ export function useChat(): EstadoChat {
           setRefreshKey(k => k + 1)
           setMensajes(prev => {
             const copia = [...prev]
-            copia[copia.length - 1] = { ...copia[copia.length - 1], parcial: false }
+            copia[copia.length - 1] = { ...copia[copia.length - 1], parcial: false, id: evento.assistantMessageId ?? copia[copia.length - 1].id }
             return copia
           })
         } else if (evento.tipo === 'error') {
@@ -100,5 +104,19 @@ export function useChat(): EstadoChat {
     setRefreshKey(0)
   }, [])
 
-  return { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, resetear }
+  const enviarFeedback = useCallback(async (messageId: string, feedback: FeedbackValor) => {
+    const mensajeAnterior = mensajes.find(m => m.id === messageId)
+    if (!mensajeAnterior) return
+
+    setMensajes(prev => prev.map(m => (m.id === messageId ? { ...m, feedback } : m)))
+
+    try {
+      await enviarFeedbackMensaje(messageId, feedback)
+    } catch (err) {
+      setMensajes(prev => prev.map(m => (m.id === messageId ? { ...m, feedback: mensajeAnterior.feedback ?? null } : m)))
+      throw err
+    }
+  }, [mensajes])
+
+  return { mensajes, cargando, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear }
 }
