@@ -10,9 +10,14 @@ const messageRoutes = require('./routes/messageRoutes')
 const errorMiddleware = require('./middlewares/errorMiddleware')
 
 const app = express()
+const corsOrigin = process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : 'http://localhost:5173')
 
 app.set('trust proxy', 1)
-app.use(cors())
+
+app.use(cors({
+  origin: corsOrigin,
+  credentials: false,
+}))
 app.use(express.json())
 
 app.get('/api/health', (req, res) => {

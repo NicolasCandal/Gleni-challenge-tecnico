@@ -5,6 +5,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY:  z.string().min(1, { message: 'no puede estar vacío' }),
   OPENAI_API_KEY:     z.string().min(1, { message: 'no puede estar vacío' }),
   OPENAI_MODEL:       z.string().default('gpt-4o-mini'),
+  CORS_ORIGIN:        z.string().url({ message: 'debe ser una URL válida (ej: http://localhost:5173)' }).optional(),
   UMBRAL_SPREAD_ALTO: z.coerce.number().positive().default(2.5),
   UMBRAL_SPREAD_BAJO: z.coerce.number().positive().default(1.5),
   UMBRAL_BRECHA_ALTA: z.coerce.number().positive().default(8),
