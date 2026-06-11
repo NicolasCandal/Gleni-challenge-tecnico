@@ -166,6 +166,21 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
 
     if (!toolCalls.length) {
       respuestaFinal = mensajeAsistente.content
+      if (tokensUsados) {
+        try {
+          await repositorioEjecucion.crear({
+            idConversacion,
+            nombreHerramienta: '_turno',
+            entrada: null,
+            salida: null,
+            latenciaMs: 0,
+            tokensUsados,
+            errorMsg: null
+          })
+        } catch (err) {
+          console.error('Error al persistir tokens del turno:', err.message)
+        }
+      }
       break
     }
 
