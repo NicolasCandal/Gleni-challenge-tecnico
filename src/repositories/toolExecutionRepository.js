@@ -24,6 +24,7 @@ async function listarPorConversacion(idConversacion) {
     .from('tool_executions')
     .select('*')
     .eq('conversation_id', idConversacion)
+    .neq('tool_name', '_turno')
     .order('created_at', { ascending: true })
 
   if (error) throw error
