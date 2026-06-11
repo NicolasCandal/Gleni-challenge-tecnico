@@ -1,4 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') })
+const { validateEnv } = require('./schemas/env.schema')
+validateEnv()
+
 const express = require('express')
 const cors = require('cors')
 const chatRoutes = require('./routes/chatRoutes')
