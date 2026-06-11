@@ -1,5 +1,7 @@
 # Asesor de Cambio de Divisas
 
+![Tests](https://github.com/NicolasCandal/Gleni-challenge-tecnico/actions/workflows/test.yml/badge.svg)
+
 **Demo:** [https://gleniproject.vercel.app/](https://gleniproject.vercel.app/)
 
 Agente conversacional que consulta cotizaciones del dólar en Argentina en tiempo real y brinda recomendaciones sobre cuándo y dónde operar.

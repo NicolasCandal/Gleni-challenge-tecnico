@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Correr tests
+        run: npm test
+        env:
+          SUPABASE_URL: https://dummy.supabase.co
+          SUPABASE_ANON_KEY: dummy-anon-key
+          OPENAI_API_KEY: dummy-api-key
+          OPENAI_MODEL: gpt-4o-mini
+          UMBRAL_SPREAD_ALTO: 2.5
+          UMBRAL_SPREAD_BAJO: 1.5
+          UMBRAL_BRECHA_ALTA: 8
+          UMBRAL_BRECHA_BAJA: 3
