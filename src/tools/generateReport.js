@@ -26,6 +26,7 @@ async function manejador({ conversation_id: idConversacion }) {
   const totalConsultas = mensajes.filter(m => m.role === 'user').length
 
   const usoHerramientas = ejecuciones.reduce((acumulador, e) => {
+    if (e.tool_name === '_turno') return acumulador
     acumulador[e.tool_name] = (acumulador[e.tool_name] || 0) + 1
     return acumulador
   }, {})

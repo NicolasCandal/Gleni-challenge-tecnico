@@ -1,7 +1,5 @@
-// En producción, frontend y backend viven en el mismo dominio de Vercel,
-// así que las rutas relativas ('') funcionan. Para desarrollo local, definir
-// VITE_API_URL=http://localhost:3000 en client/.env
-const URL_BASE = import.meta.env.VITE_API_URL ?? ''
+// Las rutas son relativas: en producción frontend y backend comparten dominio en Vercel;
+// en desarrollo el proxy de vite.config.ts reenvía /api → http://localhost:3000.
 
 export interface EjecucionHerramienta {
   id: string
@@ -15,7 +13,7 @@ export interface EjecucionHerramienta {
 }
 
 export async function fetchEjecuciones(conversationId: string): Promise<EjecucionHerramienta[]> {
-  const respuesta = await fetch(`${URL_BASE}/api/sessions/${conversationId}/executions`)
+  const respuesta = await fetch(`/api/sessions/${conversationId}/executions`)
   if (!respuesta.ok) return []
   const { ejecuciones } = await respuesta.json()
   return ejecuciones ?? []
@@ -28,7 +26,7 @@ export interface MensajeDTO {
 }
 
 export async function fetchMensajes(conversationId: string): Promise<MensajeDTO[]> {
-  const respuesta = await fetch(`${URL_BASE}/api/sessions/${conversationId}/messages`)
+  const respuesta = await fetch(`/api/sessions/${conversationId}/messages`)
   if (!respuesta.ok) return []
   const { mensajes } = await respuesta.json()
   return mensajes ?? []
@@ -51,7 +49,7 @@ export async function fetchStream(
   mensaje: string,
   onEvento: (evento: EventoSSE) => void
 ): Promise<void> {
-  const respuesta = await fetch(`${URL_BASE}/api/chat`, {
+  const respuesta = await fetch(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...(conversationId ? { conversationId } : {}), mensaje })

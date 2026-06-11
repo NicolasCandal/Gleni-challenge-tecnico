@@ -104,6 +104,10 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
     └── generateReport.test.js
 ```
 
+## Limitaciones conocidas
+
+**tokens_used por turno, no por tool**: OpenAI reporta el consumo de tokens a nivel de llamada al API (turno completo), sin desglose por tool call individual. Se persiste una fila `_turno` por turno con el total real; las filas de tools individuales tienen `tokens_used: null`. Mejora planeada: tabla `turn_metrics` separada en Supabase para desacoplar métricas de ejecución de tools.
+
 ## Configuración local
 
 1. Clonar el repositorio.

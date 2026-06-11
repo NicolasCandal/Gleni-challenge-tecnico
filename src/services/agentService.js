@@ -87,7 +87,7 @@ async function llamarOpenAI(mensajes, onChunk, intento = 0) {
   return { mensajeAsistente, toolCalls, tokensUsados }
 }
 
-async function ejecutarHerramienta(llamada, idConversacion, tokensUsados = null) {
+async function ejecutarHerramienta(llamada, idConversacion) {
   const nombreHerramienta = llamada.function.name
   const inicio = Date.now()
   let entrada = null
@@ -116,7 +116,7 @@ async function ejecutarHerramienta(llamada, idConversacion, tokensUsados = null)
       entrada,
       salida,
       latenciaMs,
-      tokensUsados,
+      tokensUsados: null,
       errorMsg
     })
   } catch (errPersistencia) {
@@ -156,8 +156,24 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
     }
 
     const resultadosHerramientas = await Promise.all(
-      toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion, tokensUsados))
+      toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
     )
+
+    if (tokensUsados) {
+      try {
+        await repositorioEjecucion.crear({
+          idConversacion,
+          nombreHerramienta: '_turno',
+          entrada: null,
+          salida: null,
+          latenciaMs: 0,
+          tokensUsados,
+          errorMsg: null
+        })
+      } catch (err) {
+        console.error('Error al persistir tokens del turno:', err.message)
+      }
+    }
 
     mensajes = [...mensajes, mensajeAsistente, ...resultadosHerramientas]
   }
