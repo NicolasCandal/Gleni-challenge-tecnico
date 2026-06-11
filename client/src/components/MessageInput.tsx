@@ -27,7 +27,7 @@ export function MessageInput({ onEnviar, deshabilitado }: Props) {
   }
 
   return (
-    <div className="flex gap-2 items-end p-4 border-t border-gray-200 bg-white">
+    <div className="flex gap-2 items-end p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
       <textarea
         ref={textareaRef}
         value={texto}
@@ -36,9 +36,11 @@ export function MessageInput({ onEnviar, deshabilitado }: Props) {
         disabled={deshabilitado}
         placeholder="Escribí tu consulta... (Enter para enviar)"
         rows={1}
-        className="flex-1 resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm
-          focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50
-          disabled:cursor-not-allowed max-h-32 overflow-y-auto"
+        className="flex-1 resize-none rounded-xl border border-gray-300 dark:border-gray-600
+          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+          placeholder-gray-400 dark:placeholder-gray-500
+          px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500
+          disabled:opacity-50 disabled:cursor-not-allowed max-h-32 overflow-y-auto"
         style={{ height: 'auto' }}
         onInput={e => {
           const t = e.currentTarget

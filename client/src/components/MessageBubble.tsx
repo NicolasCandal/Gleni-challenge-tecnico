@@ -14,7 +14,7 @@ export function MessageBubble({ mensaje }: Props) {
         className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm break-words
           ${esUsuario
             ? 'bg-blue-600 text-white rounded-br-sm whitespace-pre-wrap'
-            : 'bg-white text-gray-800 rounded-bl-sm shadow-sm border border-gray-100'
+            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-sm shadow-sm border border-gray-100 dark:border-gray-700'
           }
           ${mensaje.parcial ? 'opacity-80' : ''}
         `}
