@@ -53,6 +53,14 @@ Los tests E2E verifican al inicio si Supabase está disponible. Si no lo está (
 
 **Trade-off:** cobertura reducida en entornos aislados, pero el test suite no bloquea el pipeline por razones de infraestructura.
 
+### Conversión dual: referencia vs. operación
+
+Los precios de compra y venta se definen desde la perspectiva de la casa de cambio: "compra" es lo que la casa paga cuando el usuario vende dólares; "venta" es lo que la casa cobra cuando el usuario compra dólares. Una sola cifra resulta ambigua dependiendo de la dirección de la operación.
+
+Por eso `get_exchange_rates` devuelve dos valores cuando se pasa un monto: `referencia.resultado` (calculado siempre al precio de venta, que es el que citan medios y cotizaciones) y `operacion.resultado` (el neto real: precio de compra si el usuario vende USD, precio de venta si compra USD). Para ARS_A_USD ambos coinciden. El LLM tiene instrucción explícita en el system prompt de citar siempre los números que devuelve la tool, sin recalcular.
+
+**Trade-off:** la respuesta es más compleja, pero elimina la ambigüedad y habilita al agente a diferenciar entre una consulta informativa y una operacional.
+
 ### Rate limiting en el endpoint de chat
 
 Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP directamente en la ruta `/api/chat`. El mensaje de error es legible por el usuario.

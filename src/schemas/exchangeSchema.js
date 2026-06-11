@@ -17,12 +17,17 @@ const EsquemaCotizacion = z.object({
   senial: z.enum(['comprar', 'esperar', 'neutral'])
 })
 
+const EsquemaLadoConversion = z.object({
+  tipoCambio: z.number().positive(),
+  resultado: z.number()
+})
+
 const EsquemaConversion = z.object({
   monto: z.number(),
   direccion: z.enum(['USD_A_ARS', 'ARS_A_USD']),
   tipoUsado: z.string(),
-  tipoCambio: z.number(),
-  resultado: z.number()
+  referencia: EsquemaLadoConversion,
+  operacion: EsquemaLadoConversion.extend({ lado: z.enum(['compra', 'venta']) })
 })
 
 const EsquemaSalidaCotizaciones = z.object({

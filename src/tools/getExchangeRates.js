@@ -5,7 +5,7 @@ const { EsquemaRateTypes, EsquemaSalidaCotizaciones } = require('../schemas/exch
 
 const definicion = {
   name: 'get_exchange_rates',
-  description: 'Obtiene las cotizaciones actuales del dólar en Argentina. Cada cotización incluye spread, brecha con el oficial y señal (comprar/esperar/neutral). Si se pasa amount, calcula la conversión en el servidor.',
+  description: 'Obtiene las cotizaciones actuales del dólar en Argentina. Cada cotización incluye spread, brecha con el oficial y señal (comprar/esperar/neutral). Si se pasa amount, calcula la conversión en el servidor y devuelve dos valores: referencia (al precio de venta, el que citan los medios) y operacion (el resultado neto que recibiría/pagaría el usuario si ejecutara la transacción).',
   parameters: {
     type: 'object',
     properties: {
@@ -16,7 +16,7 @@ const definicion = {
       },
       amount: {
         type: 'number',
-        description: 'Monto a convertir. Si se omite, no se calcula conversión.'
+        description: 'Monto a convertir. Si se omite, no se calcula conversión. La respuesta incluirá conversion.referencia.resultado (al precio de venta) y conversion.operacion.resultado (al precio que le corresponde al usuario en la transacción real).'
       },
       direction: {
         type: 'string',
@@ -33,17 +33,36 @@ function calcularConversion(cotizaciones, monto, direccion) {
   if (!tipoUsado) return null
 
   const esUsdAars = direccion !== 'ARS_A_USD'
-  const tipoCambio = esUsdAars ? tipoUsado.venta : tipoUsado.compra
-  const resultado = esUsdAars
-    ? Math.round(monto * tipoCambio * 100) / 100
-    : Math.round((monto / tipoCambio) * 100) / 100
+  const redondear = (x) => Math.round(x * 100) / 100
+
+  // referencia: siempre al precio de venta (el que citan los medios)
+  const refTipoCambio = tipoUsado.venta
+  const refResultado = esUsdAars
+    ? redondear(monto * refTipoCambio)
+    : redondear(monto / refTipoCambio)
+
+  // operacion: precio que le toca al usuario en la transacción real
+  // USD_A_ARS → usuario vende USD → casa le compra → precio compra
+  // ARS_A_USD → usuario compra USD → casa le vende → precio venta
+  const opLado = esUsdAars ? 'compra' : 'venta'
+  const opTipoCambio = esUsdAars ? tipoUsado.compra : tipoUsado.venta
+  const opResultado = esUsdAars
+    ? redondear(monto * opTipoCambio)
+    : redondear(monto / opTipoCambio)
 
   return {
     monto,
     direccion: esUsdAars ? 'USD_A_ARS' : 'ARS_A_USD',
     tipoUsado: tipoUsado.nombre,
-    tipoCambio,
-    resultado
+    referencia: {
+      tipoCambio: refTipoCambio,
+      resultado: refResultado
+    },
+    operacion: {
+      lado: opLado,
+      tipoCambio: opTipoCambio,
+      resultado: opResultado
+    }
   }
 }
 

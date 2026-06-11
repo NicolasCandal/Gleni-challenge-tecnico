@@ -41,16 +41,35 @@ describe('manejador — transformación correcta', () => {
     expect(resultado.cotizaciones[0].casa).toBe('blue')
   })
 
-  test('calcula conversión cuando se pasa amount', async () => {
-    const resultado = await manejador({ amount: 100, direction: 'USD_A_ARS' })
-    expect(resultado.conversion).not.toBeNull()
-    expect(resultado.conversion.monto).toBe(100)
-    expect(resultado.conversion.resultado).toBeGreaterThan(0)
-  })
-
   test('conversion es null cuando no se pasa amount', async () => {
     const resultado = await manejador({})
     expect(resultado.conversion).toBeNull()
+  })
+
+  // Con los datos mock, ordenarParaComprar ordena por venta ascendente:
+  // oficial (venta 1010) queda primero.
+  test('USD_A_ARS: referencia usa venta y operacion usa compra del tipo más barato', async () => {
+    const resultado = await manejador({ amount: 100, direction: 'USD_A_ARS' })
+    const conv = resultado.conversion
+    expect(conv).not.toBeNull()
+    expect(conv.monto).toBe(100)
+    expect(conv.direccion).toBe('USD_A_ARS')
+    expect(conv.referencia.tipoCambio).toBe(1010)     // venta oficial
+    expect(conv.referencia.resultado).toBe(101000)    // 100 * 1010
+    expect(conv.operacion.lado).toBe('compra')
+    expect(conv.operacion.tipoCambio).toBe(1000)      // compra oficial
+    expect(conv.operacion.resultado).toBe(100000)     // 100 * 1000
+  })
+
+  test('ARS_A_USD: referencia y operacion coinciden (ambas usan venta)', async () => {
+    const resultado = await manejador({ amount: 101000, direction: 'ARS_A_USD' })
+    const conv = resultado.conversion
+    expect(conv).not.toBeNull()
+    expect(conv.direccion).toBe('ARS_A_USD')
+    expect(conv.operacion.lado).toBe('venta')
+    expect(conv.referencia.tipoCambio).toBe(conv.operacion.tipoCambio)
+    expect(conv.referencia.resultado).toBe(100)       // 101000 / 1010
+    expect(conv.operacion.resultado).toBe(100)        // 101000 / 1010
   })
 
   test('incluye fuente y timestamp en la respuesta', async () => {
