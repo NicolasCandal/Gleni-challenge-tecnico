@@ -1,16 +1,16 @@
-jest.mock('../src/repositories/messageRepository', () => ({
+jest.mock('../backend/repositories/messageRepository', () => ({
   listarPorConversacion: jest.fn(),
   crear: jest.fn()
 }))
 
-jest.mock('../src/repositories/toolExecutionRepository', () => ({
+jest.mock('../backend/repositories/toolExecutionRepository', () => ({
   listarPorConversacion: jest.fn(),
   crear: jest.fn()
 }))
 
-const { manejador } = require('../src/tools/generateReport')
-const repositorioMensaje = require('../src/repositories/messageRepository')
-const repositorioEjecucion = require('../src/repositories/toolExecutionRepository')
+const { manejador } = require('../backend/tools/generateReport')
+const repositorioMensaje = require('../backend/repositories/messageRepository')
+const repositorioEjecucion = require('../backend/repositories/toolExecutionRepository')
 
 const ID_CONVERSACION = 'conv-test-123'
 

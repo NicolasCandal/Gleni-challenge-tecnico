@@ -1,8 +1,8 @@
 const request = require('supertest')
-const app = require('../src/app')
-const repositorioFeedback = require('../src/repositories/messageFeedbackRepository')
+const app = require('../backend/app')
+const repositorioFeedback = require('../backend/repositories/messageFeedbackRepository')
 
-jest.mock('../src/repositories/messageFeedbackRepository', () => ({
+jest.mock('../backend/repositories/messageFeedbackRepository', () => ({
   crearOActualizar: jest.fn(async ({ idMensaje, feedback }) => ({ id: 'feedback-id', message_id: idMensaje, feedback }))
 }))
 

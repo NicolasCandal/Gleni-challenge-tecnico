@@ -1,19 +1,19 @@
 // Cargar env vars antes que cualquier módulo los lea
 const path = require('path')
-require('dotenv').config({ path: path.join(__dirname, '../../src/.env') })
+require('dotenv').config({ path: path.join(__dirname, '../../backend/.env') })
 
-jest.mock('../../src/infrastructure/openaiClient', () => ({
+jest.mock('../../backend/infrastructure/openaiClient', () => ({
   chat: { completions: { create: jest.fn() } }
 }))
-jest.mock('../../src/infrastructure/dolarapiClient')
+jest.mock('../../backend/infrastructure/dolarapiClient')
 
 jest.setTimeout(20000)
 
 const request = require('supertest')
-const app = require('../../src/app')
-const clienteOpenAI = require('../../src/infrastructure/openaiClient')
-const { fetchExchangeRates } = require('../../src/infrastructure/dolarapiClient')
-const supabase = require('../../src/infrastructure/supabaseClient')
+const app = require('../../backend/app')
+const clienteOpenAI = require('../../backend/infrastructure/openaiClient')
+const { fetchExchangeRates } = require('../../backend/infrastructure/dolarapiClient')
+const supabase = require('../../backend/infrastructure/supabaseClient')
 
 // UUID válido pero inexistente en la DB
 const UUID_INEXISTENTE = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'

@@ -51,6 +51,7 @@ Personas que necesitan comprar o vender dólares en Argentina y quieren entender
 - Sistema de Feedback para calificar respuestas con pulgar arriba/abajo y persistir la señal en Supabase.
 - Observabilidad con logging de tools, incluyendo latencia y tokens por ejecución.
 - Panel lateral de invocaciones para inspeccionar herramientas, payloads y resultados de cada turno.
+- Multi-step reasoning: el agente encadena múltiples llamadas a tools en un mismo turno cuando la consulta lo requiere (por ejemplo, obtener cotizaciones y luego generar un reporte), resolviendo la intención completa sin intervención adicional del usuario.
 
 ## Capturas de pantalla
 
@@ -140,10 +141,16 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 
 **Trade-off:** el límite es fijo y no configurable por usuario. En producción convendría usar un store compartido (Redis) para que el límite funcione en múltiples instancias.
 
+### Restricción de origen en CORS
+
+El origen permitido se resuelve en tiempo de arranque desde la variable de entorno `CORS_ORIGIN`. Si no está definida, en desarrollo se permite `http://localhost:5173` (Vite) y en producción se bloquea cualquier origen (`false`), forzando a configurar la variable explícitamente antes de desplegar.
+
+**Trade-off:** requiere setear `CORS_ORIGIN` en Vercel (o el host elegido) para que el frontend pueda comunicarse con el backend; a cambio, se evita dejar `*` en producción y se centraliza la política en una sola variable de entorno.
+
 ### Nota de seguridad
 
 - **Estado de RLS en Supabase:** todas las tablas del proyecto están con RLS deshabilitado en este momento. Eso significa que no hay policies activas que limiten el acceso a nivel de fila dentro de Supabase.
-- **Anon key solo server-side:** la `SUPABASE_ANON_KEY` se usa únicamente en el backend, dentro de `src/infrastructure/supabaseClient.js`, para que el navegador nunca vea credenciales de acceso directo a la base. El frontend habla solo con nuestra API, y así evitamos exponer Supabase al cliente mientras el control de acceso siga centralizado en el servidor.
+- **Anon key solo server-side:** la `SUPABASE_ANON_KEY` se usa únicamente en el backend, dentro de `backend/infrastructure/supabaseClient.js`, para que el navegador nunca vea credenciales de acceso directo a la base. El frontend habla solo con nuestra API, y así evitamos exponer Supabase al cliente mientras el control de acceso siga centralizado en el servidor.
 - **Implicación práctica:** si más adelante se habilita RLS, habrá que definir policies explícitas en Supabase antes de cualquier acceso desde el cliente. Mientras tanto, la anon key no debe usarse en el frontend.
 
 ## Stack
@@ -161,11 +168,11 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 ## Estructura del proyecto
 
 ```
-├── api/              → entrypoint para Vercel (importa src/app.js)
+├── api/              → entrypoint para Vercel (importa backend/app.js)
 ├── client/           → frontend React + TypeScript
 ├── docs/             → architecture.md
 ├── .env.example      → variables de entorno de referencia
-├── src/
+├── backend/
 │   ├── app.js
 │   ├── controllers/
 │   ├── infrastructure/   → clientes externos (OpenAI, dolarapi)
@@ -190,11 +197,12 @@ Se aplica `express-rate-limit` con un límite de 10 requests/minuto por IP direc
 - **Rate limit en memoria**: el límite actual vive en proceso y no se comparte entre instancias. Mejora futura: moverlo a Redis para que el control de cuota sea consistente en múltiples despliegues.
 - **Mensajes huérfanos**: si OpenAI falla después de persistir el mensaje del usuario, la conversación puede quedar incompleta. Mejora futura: agregar una estrategia de compensación/reconciliación para cerrar el turno o marcarlo explícitamente como fallido.
 - **RLS de Supabase**: hoy todas las tablas están con RLS deshabilitado. Mejora futura: habilitar RLS y versionar policies para separar mejor acceso público, servicio y administración antes de exponer acceso directo desde el cliente.
+- **Columnas de DB reservadas para mejoras futuras**: el esquema de Supabase incluye columnas que el código aún no utiliza: `tool_executions.message_id` (vincular cada ejecución al mensaje del asistente que la originó), `messages.tool_calls` y `messages.tool_call_id` (persistir los tool calls crudos de OpenAI para auditoría completa del razonamiento del agente) y `conversations.title` (titular conversaciones automáticamente con el LLM para un futuro listado de sesiones). Se mantienen en el esquema como base para esas iteraciones.
 
 ## Configuración local
 
 1. Clonar el repositorio.
-2. Copiar `.env.example` de la raíz del repo a `src/.env` y completar las variables.
+2. Copiar `.env.example` de la raíz del repo a `backend/.env` y completar las variables.
 3. Instalar dependencias del backend: `npm install`
 4. Instalar dependencias del frontend: `cd client && npm install`
 5. Iniciar el backend: `npm run dev`

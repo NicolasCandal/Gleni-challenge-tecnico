@@ -1,18 +1,18 @@
-jest.mock('../src/infrastructure/openaiClient', () => ({
+jest.mock('../backend/infrastructure/openaiClient', () => ({
   chat: { completions: { create: jest.fn() } }
 }))
 
-jest.mock('../src/services/sessionService', () => ({
+jest.mock('../backend/services/sessionService', () => ({
   crearConversacion: jest.fn(),
   agregarMensaje: jest.fn(),
   obtenerHistorial: jest.fn()
 }))
 
-jest.mock('../src/repositories/toolExecutionRepository', () => ({
+jest.mock('../backend/repositories/toolExecutionRepository', () => ({
   crear: jest.fn()
 }))
 
-jest.mock('../src/tools/getExchangeRates', () => ({
+jest.mock('../backend/tools/getExchangeRates', () => ({
   definicion: {
     name: 'get_exchange_rates',
     description: 'mock',
@@ -21,7 +21,7 @@ jest.mock('../src/tools/getExchangeRates', () => ({
   manejador: jest.fn()
 }))
 
-jest.mock('../src/tools/generateReport', () => ({
+jest.mock('../backend/tools/generateReport', () => ({
   definicion: {
     name: 'generate_session_report',
     description: 'mock',
@@ -30,15 +30,15 @@ jest.mock('../src/tools/generateReport', () => ({
   manejador: jest.fn()
 }))
 
-jest.mock('../src/prompts/agentPrompt', () => ({
+jest.mock('../backend/prompts/agentPrompt', () => ({
   promptSistema: 'Eres un asistente de prueba.'
 }))
 
-const { chat } = require('../src/services/agentService')
-const clienteOpenAI = require('../src/infrastructure/openaiClient')
-const servicioSesion = require('../src/services/sessionService')
-const repositorioEjecucion = require('../src/repositories/toolExecutionRepository')
-const herramientaGetExchangeRates = require('../src/tools/getExchangeRates')
+const { chat } = require('../backend/services/agentService')
+const clienteOpenAI = require('../backend/infrastructure/openaiClient')
+const servicioSesion = require('../backend/services/sessionService')
+const repositorioEjecucion = require('../backend/repositories/toolExecutionRepository')
+const herramientaGetExchangeRates = require('../backend/tools/getExchangeRates')
 
 const ID_CONV = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const TEXTO_RESPUESTA = 'El dólar blue cotiza a $1200.'

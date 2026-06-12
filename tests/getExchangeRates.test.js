@@ -1,7 +1,7 @@
-jest.mock('../src/infrastructure/dolarapiClient')
+jest.mock('../backend/infrastructure/dolarapiClient')
 
-const { fetchExchangeRates } = require('../src/infrastructure/dolarapiClient')
-const { manejador } = require('../src/tools/getExchangeRates')
+const { fetchExchangeRates } = require('../backend/infrastructure/dolarapiClient')
+const { manejador } = require('../backend/tools/getExchangeRates')
 
 const datosValidos = [
   { casa: 'oficial', nombre: 'Oficial', compra: 1000, venta: 1010, fechaActualizacion: '2026-01-01T00:00:00.000Z' },

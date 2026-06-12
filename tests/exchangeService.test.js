@@ -1,4 +1,4 @@
-const { calcularBrecha, ordenarParaComprar, obtenerSenial } = require('../src/services/exchangeService')
+const { calcularBrecha, ordenarParaComprar, obtenerSenial } = require('../backend/services/exchangeService')
 
 // Umbrales por defecto: SPREAD_ALTO=2.5, SPREAD_BAJO=1.5, BRECHA_ALTA=8, BRECHA_BAJA=3
 

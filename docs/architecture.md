@@ -110,16 +110,16 @@ Cliente (React + Vite)
 
 | Capa            | Carpeta                  | Responsabilidad                                     |
 |-----------------|--------------------------|-----------------------------------------------------|
-| Rutas           | `src/routes/`            | Mapeo de endpoints HTTP a controllers               |
-| Controllers     | `src/controllers/`       | Manejo de req/res, SSE, delegación al service       |
-| Services        | `src/services/`          | Lógica de negocio, orquestación del agente          |
-| Tools           | `src/tools/`             | Implementación de las herramientas del agente       |
-| Repositories    | `src/repositories/`      | Acceso a datos vía Supabase                         |
-| Infrastructure  | `src/infrastructure/`    | Clientes externos (OpenAI, dolarapi)                |
-| Mappers         | `src/mappers/`           | Transformación entre capas (raw → dominio → DTO)    |
-| Schemas         | `src/schemas/`           | Validación Zod de entradas y salidas                |
-| Middlewares     | `src/middlewares/`       | Validación, rate limiting, manejo de errores        |
-| Prompts         | `src/prompts/`           | System prompt del agente con few-shots              |
+| Rutas           | `backend/routes/`            | Mapeo de endpoints HTTP a controllers               |
+| Controllers     | `backend/controllers/`       | Manejo de req/res, SSE, delegación al service       |
+| Services        | `backend/services/`          | Lógica de negocio, orquestación del agente          |
+| Tools           | `backend/tools/`             | Implementación de las herramientas del agente       |
+| Repositories    | `backend/repositories/`      | Acceso a datos vía Supabase                         |
+| Infrastructure  | `backend/infrastructure/`    | Clientes externos (OpenAI, dolarapi)                |
+| Mappers         | `backend/mappers/`           | Transformación entre capas (raw → dominio → DTO)    |
+| Schemas         | `backend/schemas/`           | Validación Zod de entradas y salidas                |
+| Middlewares     | `backend/middlewares/`       | Validación, rate limiting, manejo de errores        |
+| Prompts         | `backend/prompts/`           | System prompt del agente con few-shots              |
 
 ## Endpoints disponibles
 
