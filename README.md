@@ -162,6 +162,30 @@ El origen permitido se resuelve en tiempo de arranque desde la variable de entor
 
 **Trade-off:** requiere setear `CORS_ORIGIN` en Vercel (o el host elegido) para que el frontend pueda comunicarse con el backend; a cambio, se evita dejar `*` en producción y se centraliza la política en una sola variable de entorno.
 
+### Registro centralizado de tools con inyección de contexto
+
+Las tools se registran en `backend/tools/index.js`, que exporta un único array del cual se derivan tanto el mapa de manejadores como las definiciones para OpenAI. Todos los manejadores reciben la firma `manejador(entrada, contexto)` donde el contexto incluye `idConversacion`. Agregar una tool nueva es crear su archivo y sumarla al índice, sin tocar `agentService` (principio Open/Closed). Esto también eliminó el caso especial donde el service conocía los internals de `generate_session_report`.
+
+### Eventos SSE como DTOs desde el service
+
+`agentService` emite siempre eventos tipados creados por `ChatDTO` (`eventoChunk`, `eventoUsage`, `eventoToolStart`) en lugar de strings y objetos ad-hoc. El controller quedó como un pipe que escribe al stream sin hacer dispatch por tipo. El contrato de eventos vive en un solo lugar.
+
+**Trade-off:** un nivel más de indirección, a cambio de un contrato explícito y un controller sin lógica.
+
+### Cache TTL en memoria para cotizaciones
+
+`dolarapiClient` cachea la respuesta de la API externa durante 30 segundos. Reduce latencia percibida, protege contra rate limits de la fuente y baja la dependencia de su disponibilidad.
+
+**Trade-off:** las cotizaciones pueden estar desfasadas hasta el TTL elegido; el cache vive en proceso y no se comparte entre instancias (mismo trade-off ya documentado para el rate limiter).
+
+### Timeout en la llamada a OpenAI
+
+La llamada de streaming usa `AbortSignal.timeout(30000)` para que un stream colgado no deje la función serverless bloqueada hasta el timeout de plataforma. Consistente con el timeout de 5s ya aplicado a la API externa.
+
+### Monolito modular (por qué no microservicios)
+
+Se eligió deliberadamente un monolito modular por la escala del proyecto. La separación en capas deja costuras de servicio claras: el módulo de cotizaciones (tool + cliente HTTP + service de cálculo) podría extraerse como servicio independiente sin tocar el agente. El backend es stateless salvo el rate limiter (migración a Redis ya documentada) y la configuración está externalizada por env vars. El único acoplamiento que bloquearía una extracción es el cliente de Supabase compartido: en una arquitectura de servicios, cada uno tendría su propio schema o accedería vía API.
+
 ### Nota de seguridad
 
 - **Estado de RLS en Supabase:** todas las tablas del proyecto están con RLS deshabilitado en este momento. Eso significa que no hay policies activas que limiten el acceso a nivel de fila dentro de Supabase.
@@ -214,6 +238,10 @@ El origen permitido se resuelve en tiempo de arranque desde la variable de entor
 - **Mensajes huérfanos**: si OpenAI falla después de persistir el mensaje del usuario, la conversación puede quedar incompleta. Mejora futura: agregar una estrategia de compensación/reconciliación para cerrar el turno o marcarlo explícitamente como fallido.
 - **RLS de Supabase**: hoy todas las tablas están con RLS deshabilitado. Mejora futura: habilitar RLS y versionar policies para separar mejor acceso público, servicio y administración antes de exponer acceso directo desde el cliente.
 - **Columnas de DB reservadas para mejoras futuras**: el esquema de Supabase incluye columnas que el código aún no utiliza: `tool_executions.message_id` (vincular cada ejecución al mensaje del asistente que la originó), `messages.tool_calls` y `messages.tool_call_id` (persistir los tool calls crudos de OpenAI para auditoría completa del razonamiento del agente) y `conversations.title` (titular conversaciones automáticamente con el LLM para un futuro listado de sesiones). Se mantienen en el esquema como base para esas iteraciones.
+- **Parseo del streaming de OpenAI dentro de agentService**: el ensamblado de deltas y tool_calls y el retry con backoff conviven con la orquestación del agente. Mejora futura: extraerlos a `infrastructure/openaiStreamClient.js` para que el service sea solo orquestación.
+- **Historial sin límite de crecimiento**: cada turno carga la conversación completa como contexto. En sesiones muy largas esto encarece cada request y puede superar el límite de contexto del modelo. Mejora futura: cap a los últimos N mensajes o resumen incremental del historial.
+- **Acceso a conversaciones por posesión del UUID**: los endpoints de sesión no tienen autenticación; quien tenga el UUID de una conversación puede leerla. Los UUID v4 son impredecibles, lo cual es aceptable para una demo. Mejora futura: autenticación de usuarios y ownership de conversaciones.
+- **Duplicación manual de tipos entre backend y frontend**: los DTOs del backend y las interfaces TypeScript del client se mantienen a mano y pueden divergir silenciosamente. Mejora futura: paquete de tipos compartidos o contrato OpenAPI generado.
 
 ## Configuración local
 

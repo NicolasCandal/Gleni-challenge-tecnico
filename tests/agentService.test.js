@@ -98,7 +98,10 @@ describe('agentService.chat — flujo con tool call', () => {
   test('ejecuta el manejador de la herramienta con los argumentos del stream', async () => {
     await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
 
-    expect(herramientaGetExchangeRates.manejador).toHaveBeenCalledWith({ rate_types: ['blue'] })
+    expect(herramientaGetExchangeRates.manejador).toHaveBeenCalledWith(
+      { rate_types: ['blue'] },
+      { idConversacion: ID_CONV }
+    )
   })
 
   test('emite tool_start por onChunk antes de ejecutar la herramienta', async () => {

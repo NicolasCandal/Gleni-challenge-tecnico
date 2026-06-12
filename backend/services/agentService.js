@@ -78,7 +78,7 @@ async function chat(idConversacion, mensajeUsuario, onEvento) {
           await repositorioEjecucion.crear({
             idConversacion,
             nombreHerramienta: '_turno',
-            entrada: null,
+            entrada: {},
             salida: null,
             latenciaMs: 0,
             tokensUsados,
