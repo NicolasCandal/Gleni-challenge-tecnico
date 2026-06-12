@@ -1,101 +1,14 @@
-const clienteOpenAI = require('../infrastructure/openaiClient')
+const { completarConStream } = require('../infrastructure/openaiStreamClient')
 const servicioSesion = require('./sessionService')
 const repositorioEjecucion = require('../repositories/toolExecutionRepository')
 const { promptSistema } = require('../prompts/agentPrompt')
-const herramientaGetExchangeRates = require('../tools/getExchangeRates')
-const herramientaGenerateReport = require('../tools/generateReport')
+const herramientas = require('../tools')
+const { eventoToolStart } = require('../dtos/ChatDTO')
 
-const HERRAMIENTAS = {
-  [herramientaGetExchangeRates.definicion.name]: herramientaGetExchangeRates.manejador,
-  [herramientaGenerateReport.definicion.name]: herramientaGenerateReport.manejador
-}
+const HERRAMIENTAS = Object.fromEntries(herramientas.map(t => [t.definicion.name, t.manejador]))
+const DEFINICIONES_HERRAMIENTAS = herramientas.map(t => ({ type: 'function', function: t.definicion }))
 
-const DEFINICIONES_HERRAMIENTAS = [
-  { type: 'function', function: herramientaGetExchangeRates.definicion },
-  { type: 'function', function: herramientaGenerateReport.definicion }
-]
-
-const MAX_REINTENTOS = 2
 const MAX_ITERACIONES_TOOLS = 4
-const DEMORA_BASE_MS = 1000
-
-// Llama a OpenAI con stream:true. Acumula tool_calls de los deltas y llama onChunk
-// con cada delta de texto. OpenAI no emite texto cuando decide usar tools, así que
-// onChunk solo dispara en la iteración final que devuelve respuesta de texto.
-async function llamarOpenAI(mensajes, onChunk, intento = 0, tokensBase = 0) {
-  let flujo
-  try {
-    flujo = await clienteOpenAI.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages: mensajes,
-      tools: DEFINICIONES_HERRAMIENTAS,
-      tool_choice: 'auto',
-      stream: true,
-      stream_options: { include_usage: true }
-    })
-  } catch (err) {
-    if (err.status === 429 && intento < MAX_REINTENTOS) {
-      const demora = DEMORA_BASE_MS * Math.pow(2, intento)
-      await new Promise(res => setTimeout(res, demora))
-      return llamarOpenAI(mensajes, onChunk, intento + 1, tokensBase)
-    }
-    throw err
-  }
-
-  let contenidoTexto = ''
-  const mapaToolCalls = {}
-  let tokensUsados = null
-  let tokensEstimados = tokensBase
-
-  for await (const chunk of flujo) {
-    if (chunk.usage) {
-      tokensUsados = chunk.usage.total_tokens
-      onChunk?.({ tipo: 'usage', tokens: tokensBase + tokensUsados })
-      continue
-    }
-
-    const delta = chunk.choices[0]?.delta
-    if (!delta) continue
-
-    if (delta.content) {
-      contenidoTexto += delta.content
-      onChunk?.(delta.content)
-      try {
-        const chars = delta.content.length || 0
-        const incremento = Math.max(1, Math.ceil(chars / 4))
-        tokensEstimados += incremento
-        onChunk?.({ tipo: 'usage', tokens: tokensEstimados })
-      } catch (e) {
-        // no bloquear por errores de estimación
-      }
-    }
-
-    if (delta.tool_calls) {
-      for (const tc of delta.tool_calls) {
-        if (!mapaToolCalls[tc.index]) {
-          mapaToolCalls[tc.index] = {
-            id: tc.id,
-            type: 'function',
-            function: { name: tc.function?.name ?? '', arguments: '' }
-          }
-        }
-        if (tc.function?.arguments) {
-          mapaToolCalls[tc.index].function.arguments += tc.function.arguments
-        }
-      }
-    }
-  }
-
-  const toolCalls = Object.values(mapaToolCalls)
-
-  const mensajeAsistente = {
-    role: 'assistant',
-    content: contenidoTexto || null,
-    ...(toolCalls.length ? { tool_calls: toolCalls } : {})
-  }
-
-  return { mensajeAsistente, toolCalls, tokensUsados }
-}
 
 async function ejecutarHerramienta(llamada, idConversacion) {
   const nombreHerramienta = llamada.function.name
@@ -109,10 +22,7 @@ async function ejecutarHerramienta(llamada, idConversacion) {
     if (!manejador) throw new Error(`herramienta desconocida: ${nombreHerramienta}`)
 
     entrada = JSON.parse(llamada.function.arguments)
-    if (nombreHerramienta === 'generate_session_report') {
-      entrada.conversation_id = idConversacion
-    }
-    salida = await manejador(entrada)
+    salida = await manejador(entrada, { idConversacion })
   } catch (err) {
     errorMsg = err.message
   }
@@ -142,7 +52,7 @@ async function ejecutarHerramienta(llamada, idConversacion) {
   }
 }
 
-async function chat(idConversacion, mensajeUsuario, onChunk) {
+async function chat(idConversacion, mensajeUsuario, onEvento) {
   if (!idConversacion) {
     const conversacion = await servicioSesion.crearConversacion()
     idConversacion = conversacion.id
@@ -158,7 +68,7 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
   let tokensAcumulados = 0
 
   while (iteracion < MAX_ITERACIONES_TOOLS) {
-    const { mensajeAsistente, toolCalls, tokensUsados } = await llamarOpenAI(mensajes, onChunk, 0, tokensAcumulados)
+    const { mensajeAsistente, toolCalls, tokensUsados } = await completarConStream(mensajes, DEFINICIONES_HERRAMIENTAS, onEvento, tokensAcumulados)
     iteracion++
 
     if (!toolCalls.length) {
@@ -182,7 +92,7 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
     }
 
     toolCalls.forEach(llamada => {
-      onChunk?.({ tipo: 'tool_start', herramienta: llamada.function.name })
+      onEvento?.(eventoToolStart(llamada.function.name))
     })
 
     const resultadosHerramientas = await Promise.all(

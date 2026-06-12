@@ -8,17 +8,12 @@ const definicion = {
   description: 'Genera un reporte de la sesión actual: total de consultas, herramientas usadas, latencia promedio, tipos de dólar consultados y errores. No llama a la API externa.',
   parameters: {
     type: 'object',
-    properties: {
-      conversation_id: {
-        type: 'string',
-        description: 'ID de la conversación a reportar.'
-      }
-    },
-    required: ['conversation_id']
+    properties: {},
+    required: []
   }
 }
 
-async function manejador({ conversation_id: idConversacion }) {
+async function manejador(_entrada, { idConversacion }) {
   const [mensajes, ejecuciones] = await Promise.all([
     repositorioMensaje.listarPorConversacion(idConversacion),
     repositorioEjecucion.listarPorConversacion(idConversacion)

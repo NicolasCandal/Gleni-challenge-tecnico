@@ -1,8 +1,7 @@
 const repositorioEjecucion = require('../repositories/toolExecutionRepository')
 const repositorioMensaje = require('../repositories/messageRepository')
-const { filaDBADto } = require('../mappers/messageMapper')
+const { crearMensajeDTO, crearRespuestaMensajesDTO } = require('../dtos/MessageDTO')
 const { crearEjecucionDTO, crearRespuestaEjecucionesDTO } = require('../dtos/ToolExecutionDTO')
-const { crearRespuestaMensajesDTO } = require('../dtos/MessageDTO')
 
 async function obtenerEjecuciones(req, res, next) {
   try {
@@ -19,7 +18,7 @@ async function obtenerMensajes(req, res, next) {
   try {
     const { id } = req.params
     const filas = await repositorioMensaje.listarPorConversacion(id)
-    const mensajes = filas.map(filaDBADto)
+    const mensajes = filas.map(crearMensajeDTO)
     res.json(crearRespuestaMensajesDTO(mensajes))
   } catch (err) {
     next(err)

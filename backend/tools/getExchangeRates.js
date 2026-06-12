@@ -62,7 +62,7 @@ function calcularConversion(cotizaciones, monto, direccion) {
   })
 }
 
-async function manejador({ rate_types, amount, direction } = {}) {
+async function manejador({ rate_types, amount, direction } = {}, _contexto) {
   EsquemaRateTypes.parse(rate_types)
 
   const { datos, fuente, esFallback } = await fetchExchangeRates()
