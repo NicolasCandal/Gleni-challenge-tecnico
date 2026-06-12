@@ -116,10 +116,31 @@ Cliente (React + Vite)
 | Tools           | `backend/tools/`             | Implementación de las herramientas del agente       |
 | Repositories    | `backend/repositories/`      | Acceso a datos vía Supabase                         |
 | Infrastructure  | `backend/infrastructure/`    | Clientes externos (OpenAI, dolarapi)                |
+| DTOs            | `backend/dtos/`              | Forma de las respuestas (cliente/LLM) sin exponer columnas de DB |
 | Mappers         | `backend/mappers/`           | Transformación entre capas (raw → dominio → DTO)    |
 | Schemas         | `backend/schemas/`           | Validación Zod de entradas y salidas                |
 | Middlewares     | `backend/middlewares/`       | Validación, rate limiting, manejo de errores        |
 | Prompts         | `backend/prompts/`           | System prompt del agente con few-shots              |
+
+## DTOs: contrato de salida
+
+Las respuestas nunca devuelven la fila cruda de Supabase. Cada salida hacia el cliente (o hacia el LLM como resultado de una tool) se arma con una factory de `backend/dtos/`, que hace whitelist de campos y traduce el snake_case de la base a camelCase del dominio.
+
+| DTO                     | Producido por                          | Consumido por         | Forma pública |
+|-------------------------|----------------------------------------|-----------------------|---------------|
+| `ChatDTO`               | `chatController` (stream SSE)          | Cliente (EventSource) | `{ tipo, ... }` por evento: `chunk`, `usage`, `tool_start`, `error`, `fin` |
+| `MessageDTO`            | `sessionController.obtenerMensajes`    | Cliente               | `{ id, role, content, creadoEn, feedback }` |
+| `MessageDTO` (feedback) | `messageController.registrarFeedback`  | Cliente               | `{ idMensaje, feedback }` |
+| `ToolExecutionDTO`      | `sessionController.obtenerEjecuciones` | Cliente (ToolPanel)   | `{ id, herramienta, input, output, latenciaMs, tokensUsados, error, creadoEn }` |
+| `ExchangeDTO`           | `get_exchange_rates`                   | Agente LLM / cliente  | cotizaciones + `conversion` (`referencia` / `operacion`) |
+| `ReportDTO`             | `generate_session_report`              | Agente LLM            | métricas de la sesión |
+
+Reglas que sigue la capa:
+
+- **Whitelist explícito:** `MessageDTO` recibe la fila completa (`select('*')`) y devuelve solo 5 campos; una columna nueva en la DB no se filtra sola.
+- **Sin estructura interna:** se omiten columnas que el cliente no necesita (ej. `conversation_id` en `ToolExecutionDTO`, ya presente en la URL) y se normalizan entidades crudas (la fila de `feedback` no expone `id` ni `created_at`).
+- **camelCase en español** como convención única de los campos de salida, independiente del snake_case de Postgres.
+- **Mappers** (`backend/mappers/`) traducen el dato crudo (fila de DB o respuesta de dolarapi) al DTO, separando esa transformación de la definición del DTO.
 
 ## Endpoints disponibles
 

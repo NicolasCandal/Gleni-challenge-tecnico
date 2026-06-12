@@ -1,11 +1,7 @@
+const { crearCotizacionBaseDTO } = require('../dtos/ExchangeDTO')
+
 function mapearCotizacion(item) {
-  return {
-    casa: item.casa,
-    nombre: item.nombre,
-    compra: item.compra,
-    venta: item.venta,
-    fechaActualizacion: item.fechaActualizacion
-  }
+  return crearCotizacionBaseDTO(item)
 }
 
 function rawACotizaciones(datos, fuente, esFallback = false) {

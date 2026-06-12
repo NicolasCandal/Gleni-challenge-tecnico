@@ -97,6 +97,21 @@ Personas que necesitan comprar o vender dólares en Argentina y quieren entender
 
 ## Decisiones técnicas y trade-offs
 
+### DTOs para la salida de la API
+
+Toda respuesta que sale del backend hacia el cliente (o hacia el LLM como resultado de una tool) se construye con una factory en `backend/dtos/`, en lugar de devolver la fila cruda de Supabase. El objetivo es transportar datos entre capas sin filtrar la estructura interna de la base.
+
+- **`MessageDTO`**: `crearMensajeDTO` hace whitelist de `id`, `role`, `content`, `creadoEn` y `feedback` sobre el `select('*')` del repositorio, descartando cualquier otra columna. `crearFeedbackDTO` normaliza la fila de `feedback` a `{ idMensaje, feedback }` para no exponer `id` ni `created_at`.
+- **`ToolExecutionDTO`**: expone solo los campos que consume el panel del cliente y omite `conversation_id` (ya viaja en la URL del endpoint).
+- **`ChatDTO`**: factories de los eventos SSE (`chunk`, `usage`, `tool_start`, `error`, `fin`); desacoplan el formato de wire del controller.
+- **`ExchangeDTO`** y **`ReportDTO`**: forma de salida de las tools `get_exchange_rates` y `generate_session_report` antes de devolverla al agente.
+
+Los **mappers** (`backend/mappers/`) son el puente entre el dato crudo (fila de DB o respuesta de dolarapi) y el DTO: `messageMapper` y `exchangeMapper` aíslan esa traducción de la definición del DTO.
+
+**Convención:** los campos de salida usan camelCase en español (`creadoEn`, `latenciaMs`, `tokensUsados`, `idMensaje`), nunca el snake_case de las columnas de Postgres. Así el contrato público no refleja el esquema de la base y se puede refactorizar la DB sin romper al cliente.
+
+**Trade-off:** una capa extra de indirección y factories por mantener; a cambio, el cliente nunca ve columnas internas y el renombrado de un campo de salida queda en un solo lugar.
+
 ### CommonJS en lugar de ESM
 
 El proyecto usa `@babel/preset-env` con Jest. ESM nativo hubiera requerido configuración adicional de Jest (`--experimental-vm-modules`) o un transpilador extra. CommonJS (`require`/`module.exports`) funciona sin fricción con el toolchain existente.
@@ -175,6 +190,7 @@ El origen permitido se resuelve en tiempo de arranque desde la variable de entor
 ├── backend/
 │   ├── app.js
 │   ├── controllers/
+│   ├── dtos/             → objetos de transferencia (salida a cliente/LLM)
 │   ├── infrastructure/   → clientes externos (OpenAI, dolarapi)
 │   ├── mappers/
 │   ├── middlewares/

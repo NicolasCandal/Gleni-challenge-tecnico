@@ -78,7 +78,7 @@ function TarjetaEjecucion({ ejec, dark }: { ejec: EjecucionHerramienta; dark: bo
     >
       <AccordionSummary
         expandIcon={<ExpandMoreIcon fontSize="small" />}
-        aria-label={`${ejec.tool_name} - Presiona para ver detalles`}
+        aria-label={`${ejec.herramienta} - Presiona para ver detalles`}
         sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 0.5, overflow: 'hidden' } }}
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -86,15 +86,15 @@ function TarjetaEjecucion({ ejec, dark }: { ejec: EjecucionHerramienta; dark: bo
             variant="caption"
             sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: dark ? '#f9fafb' : 'text.primary' }}
           >
-            {ejec.tool_name}
+            {ejec.herramienta}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Typography variant="caption" sx={{ color: dark ? '#cbd5e1' : 'text.secondary' }} title="Latencia">
-              {ejec.latency_ms} ms
+              {ejec.latenciaMs} ms
             </Typography>
-            {ejec.tokens_used != null && (
+            {ejec.tokensUsados != null && (
               <Typography variant="caption" sx={{ color: dark ? '#cbd5e1' : 'text.secondary' }} title="Tokens usados">
-                {ejec.tokens_used} tokens
+                {ejec.tokensUsados} tokens
               </Typography>
             )}
             {ejec.error && (

@@ -1,4 +1,5 @@
 const servicioAgente = require('../services/agentService')
+const { eventoChunk, eventoUsage, eventoToolStart, eventoError, eventoFin } = require('../dtos/ChatDTO')
 
 async function chat(req, res, next) {
   res.setHeader('Content-Type', 'text/event-stream')
@@ -13,20 +14,20 @@ async function chat(req, res, next) {
 
     const onChunk = (payload) => {
       if (typeof payload === 'string') {
-        enviarEvento({ tipo: 'chunk', texto: payload })
+        enviarEvento(eventoChunk(payload))
       } else if (payload && payload.tipo === 'usage') {
-        enviarEvento({ tipo: 'usage', tokens: payload.tokens })
+        enviarEvento(eventoUsage(payload.tokens))
       } else if (payload && payload.tipo === 'tool_start') {
-        enviarEvento({ tipo: 'tool_start', herramienta: payload.herramienta })
+        enviarEvento(eventoToolStart(payload.herramienta))
       }
     }
 
     const resultado = await servicioAgente.chat(conversationId ?? null, mensaje, onChunk)
 
-    enviarEvento({ tipo: 'fin', conversationId: resultado.conversationId, assistantMessageId: resultado.assistantMessageId })
+    enviarEvento(eventoFin(resultado.conversationId, resultado.assistantMessageId))
     res.end()
   } catch (err) {
-    enviarEvento({ tipo: 'error', mensaje: err.message || 'Error interno del servidor', status: err.status || 500 })
+    enviarEvento(eventoError(err.message || 'Error interno del servidor', err.status || 500))
     res.end()
   }
 }

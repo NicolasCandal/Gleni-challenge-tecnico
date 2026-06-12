@@ -3,13 +3,13 @@
 
 export interface EjecucionHerramienta {
   id: string
-  tool_name: string
+  herramienta: string
   input: unknown
   output: unknown
-  latency_ms: number
-  tokens_used: number | null
+  latenciaMs: number
+  tokensUsados: number | null
   error: string | null
-  created_at: string
+  creadoEn: string
 }
 
 export async function fetchEjecuciones(conversationId: string): Promise<EjecucionHerramienta[]> {
@@ -23,7 +23,7 @@ export interface MensajeDTO {
   id: string
   role: 'user' | 'assistant'
   content: string
-  created_at: string
+  creadoEn: string
   feedback?: 'up' | 'down' | null
 }
 

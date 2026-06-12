@@ -26,10 +26,12 @@ describe('POST /api/messages/:id/feedback', () => {
       idMensaje: messageId,
       feedback: 'up'
     })
-    expect(res.body.feedback).toMatchObject({
-      id: 'feedback-id',
-      message_id: messageId,
+    expect(res.body.feedback).toEqual({
+      idMensaje: messageId,
       feedback: 'up'
     })
+    // No debe filtrar columnas internas de la tabla feedback
+    expect(res.body.feedback).not.toHaveProperty('id')
+    expect(res.body.feedback).not.toHaveProperty('message_id')
   })
 })

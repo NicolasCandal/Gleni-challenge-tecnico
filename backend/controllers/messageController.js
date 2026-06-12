@@ -1,5 +1,6 @@
 const { z } = require('zod')
 const repositorioFeedback = require('../repositories/messageFeedbackRepository')
+const { crearRespuestaFeedbackDTO } = require('../dtos/MessageDTO')
 
 const EsquemaIdMensaje = z.string().uuid()
 
@@ -16,7 +17,7 @@ async function registrarFeedback(req, res, next) {
       feedback
     })
 
-    res.status(201).json({ feedback: feedbackGuardado })
+    res.status(201).json(crearRespuestaFeedbackDTO(feedbackGuardado))
   } catch (err) {
     next(err)
   }

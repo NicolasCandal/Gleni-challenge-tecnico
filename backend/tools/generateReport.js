@@ -1,5 +1,6 @@
 const repositorioMensaje = require('../repositories/messageRepository')
 const repositorioEjecucion = require('../repositories/toolExecutionRepository')
+const { crearReporteDTO } = require('../dtos/ReportDTO')
 
 
 const definicion = {
@@ -45,7 +46,7 @@ async function manejador({ conversation_id: idConversacion }) {
     .filter(e => e.error)
     .map(e => ({ herramienta: e.tool_name, error: e.error }))
 
-  return {
+  return crearReporteDTO({
     idConversacion,
     totalConsultas,
     usoHerramientas,
@@ -53,7 +54,7 @@ async function manejador({ conversation_id: idConversacion }) {
     tiposConsultados,
     errores,
     totalEjecuciones: ejecuciones.length
-  }
+  })
 }
 
 module.exports = { definicion, manejador }

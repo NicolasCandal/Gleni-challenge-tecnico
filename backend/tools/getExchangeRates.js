@@ -2,6 +2,7 @@ const { fetchExchangeRates } = require('../infrastructure/dolarapiClient')
 const { rawACotizaciones } = require('../mappers/exchangeMapper')
 const { calcularSpreads, calcularBrecha, ordenarParaComprar, agregarSenial, filtrarPorTipos } = require('../services/exchangeService')
 const { EsquemaRateTypes, EsquemaSalidaCotizaciones } = require('../schemas/exchangeSchema')
+const { crearConversionDTO, crearSalidaCotizacionesDTO } = require('../dtos/ExchangeDTO')
 
 const TIPOS_NO_OPERABLES = ['mayorista']
 
@@ -52,20 +53,13 @@ function calcularConversion(cotizaciones, monto, direccion) {
     ? redondear(monto * opTipoCambio)
     : redondear(monto / opTipoCambio)
 
-  return {
+  return crearConversionDTO({
     monto,
     direccion: esUsdAars ? 'USD_A_ARS' : 'ARS_A_USD',
     tipoUsado: tipoUsado.nombre,
-    referencia: {
-      tipoCambio: refTipoCambio,
-      resultado: refResultado
-    },
-    operacion: {
-      lado: opLado,
-      tipoCambio: opTipoCambio,
-      resultado: opResultado
-    }
-  }
+    referencia: { tipoCambio: refTipoCambio, resultado: refResultado },
+    operacion: { lado: opLado, tipoCambio: opTipoCambio, resultado: opResultado }
+  })
 }
 
 async function manejador({ rate_types, amount, direction } = {}) {
@@ -86,14 +80,14 @@ async function manejador({ rate_types, amount, direction } = {}) {
 
   const conversion = amount != null ? calcularConversion(baseConversion, amount, direction) : null
 
-  const salida = {
+  const salida = crearSalidaCotizacionesDTO({
     cotizaciones: ordenadas,
     conversion,
     omitidos: mapeado.omitidos,
     advertencia: mapeado.advertencia,
     fuente: mapeado.fuente,
     timestamp: mapeado.timestamp
-  }
+  })
 
   return EsquemaSalidaCotizaciones.parse(salida)
 }
