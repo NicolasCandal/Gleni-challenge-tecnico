@@ -186,6 +186,12 @@ La llamada de streaming usa `AbortSignal.timeout(30000)` para que un stream colg
 
 Se eligió deliberadamente un monolito modular por la escala del proyecto. La separación en capas deja costuras de servicio claras: el módulo de cotizaciones (tool + cliente HTTP + service de cálculo) podría extraerse como servicio independiente sin tocar el agente. El backend es stateless salvo el rate limiter (migración a Redis ya documentada) y la configuración está externalizada por env vars. El único acoplamiento que bloquearía una extracción es el cliente de Supabase compartido: en una arquitectura de servicios, cada uno tendría su propio schema o accedería vía API.
 
+### Streaming de OpenAI extraído a infrastructure
+
+El parseo del protocolo de streaming (acumulación de deltas, ensamblado de tool_calls, retry con backoff ante 429 y timeout configurable) vive en `backend/infrastructure/openaiStreamClient.js`. `agentService` quedó como puro orquestador del loop conversacional (SRP): no conoce el protocolo del proveedor, solo consume eventos tipados.
+
+**Trade-off:** un módulo más de infraestructura, a cambio de poder cambiar de proveedor de LLM o testear el protocolo de streaming de forma aislada sin tocar la lógica del agente.
+
 ### Nota de seguridad
 
 - **Estado de RLS en Supabase:** todas las tablas del proyecto están con RLS deshabilitado en este momento. Eso significa que no hay policies activas que limiten el acceso a nivel de fila dentro de Supabase.
@@ -238,10 +244,10 @@ Se eligió deliberadamente un monolito modular por la escala del proyecto. La se
 - **Mensajes huérfanos**: si OpenAI falla después de persistir el mensaje del usuario, la conversación puede quedar incompleta. Mejora futura: agregar una estrategia de compensación/reconciliación para cerrar el turno o marcarlo explícitamente como fallido.
 - **RLS de Supabase**: hoy todas las tablas están con RLS deshabilitado. Mejora futura: habilitar RLS y versionar policies para separar mejor acceso público, servicio y administración antes de exponer acceso directo desde el cliente.
 - **Columnas de DB reservadas para mejoras futuras**: el esquema de Supabase incluye columnas que el código aún no utiliza: `tool_executions.message_id` (vincular cada ejecución al mensaje del asistente que la originó), `messages.tool_calls` y `messages.tool_call_id` (persistir los tool calls crudos de OpenAI para auditoría completa del razonamiento del agente) y `conversations.title` (titular conversaciones automáticamente con el LLM para un futuro listado de sesiones). Se mantienen en el esquema como base para esas iteraciones.
-- **Parseo del streaming de OpenAI dentro de agentService**: el ensamblado de deltas y tool_calls y el retry con backoff conviven con la orquestación del agente. Mejora futura: extraerlos a `infrastructure/openaiStreamClient.js` para que el service sea solo orquestación.
 - **Historial sin límite de crecimiento**: cada turno carga la conversación completa como contexto. En sesiones muy largas esto encarece cada request y puede superar el límite de contexto del modelo. Mejora futura: cap a los últimos N mensajes o resumen incremental del historial.
 - **Acceso a conversaciones por posesión del UUID**: los endpoints de sesión no tienen autenticación; quien tenga el UUID de una conversación puede leerla. Los UUID v4 son impredecibles, lo cual es aceptable para una demo. Mejora futura: autenticación de usuarios y ownership de conversaciones.
 - **Duplicación manual de tipos entre backend y frontend**: los DTOs del backend y las interfaces TypeScript del client se mantienen a mano y pueden divergir silenciosamente. Mejora futura: paquete de tipos compartidos o contrato OpenAPI generado.
+- **Migración del backend a TypeScript (en progreso)**: se inició la migración del backend de JavaScript a TypeScript en la rama [`TypeScript`](https://github.com/NicolasCandal/Gleni-challenge-tecnico/tree/TypeScript) para unificar el lenguaje con el frontend, tipar los contratos de los DTOs (eliminando el riesgo de drift entre capas ya documentado) y mejorar la mantenibilidad a largo plazo. La migración quedó incompleta por la ventana de tiempo del challenge: se priorizó entregar la rama `main` estable, testeada y deployada por sobre una migración a medias. Mejora futura: completar la migración módulo a módulo empezando por schemas y DTOs.
 
 ## Configuración local
 
