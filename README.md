@@ -52,6 +52,23 @@ Personas que necesitan comprar o vender dólares en Argentina y quieren entender
 - Observabilidad con logging de tools, incluyendo latencia y tokens por ejecución.
 - Panel lateral de invocaciones para inspeccionar herramientas, payloads y resultados de cada turno.
 
+## Capturas de pantalla
+
+<div align="center">
+  <table>
+    <tr>
+      <th>Tool A – Cotizaciones</th>
+      <th>Tool B – Reporte de sesión</th>
+      <th>Modo oscuro</th>
+    </tr>
+    <tr>
+      <td align="center"><img src="docs/screenshots/Tool%20A.png" width="280"/></td>
+      <td align="center"><img src="docs/screenshots/Tool%20B.png" width="280"/></td>
+      <td align="center"><img src="docs/screenshots/Modo%20oscuro.png" width="280"/></td>
+    </tr>
+  </table>
+</div>
+
 ## Mapeo de capacidades LLM del enunciado
 
 - **Capacidad b:** responder consultas sobre cotizaciones y comparaciones del mercado, usando `get_exchange_rates` para normalizar datos, calcular brecha/spread y devolver una recomendación clara.
