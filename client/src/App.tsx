@@ -8,6 +8,7 @@ import {
   Alert,
   Backdrop,
   CircularProgress,
+  CssBaseline,
   Switch,
   Button,
   AppBar,
@@ -42,6 +43,7 @@ export default function App() {
 
   return (
     <ThemeProvider theme={muiTheme}>
+      <CssBaseline />
       <Box
         sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}
         role="application"
