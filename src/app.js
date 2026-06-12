@@ -20,18 +20,8 @@ app.use(cors({
 }))
 app.use(express.json())
 
-app.get('/api/health', async (req, res) => {
-  const clienteSupabase = require('./infrastructure/supabaseClient')
-  const { error } = await clienteSupabase.from('conversations').select('id').limit(1)
-
-  if (error) {
-    return res.status(503).json({
-      status: 'degraded',
-      supabase: { ok: false, error: error.message },
-    })
-  }
-
-  res.json({ status: 'ok', supabase: { ok: true } })
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' })
 })
 
 app.use('/api/chat', chatRoutes)
