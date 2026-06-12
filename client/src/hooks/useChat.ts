@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { fetchStream, fetchMensajes, HttpError, enviarFeedbackMensaje } from '../services/api'
 
-export type Rol = 'user' | 'assistant'
+export type Rol = 'user' | 'assistant' | 'tool_call'
 export type FeedbackValor = 'up' | 'down'
 
 export interface Mensaje {
@@ -75,31 +75,36 @@ export function useChat(): EstadoChat {
         if (evento.tipo === 'chunk') {
           setMensajes(prev => {
             const copia = [...prev]
-            const ultimo = copia[copia.length - 1]
-            copia[copia.length - 1] = { ...ultimo, contenido: ultimo.contenido + evento.texto }
+            let idx = copia.length - 1
+            while (idx >= 0 && copia[idx].rol !== 'assistant') idx--
+            if (idx === -1) return copia
+            copia[idx] = { ...copia[idx], contenido: copia[idx].contenido + evento.texto }
             return copia
           })
         } else if (evento.tipo === 'usage') {
           setTokensLive(evento.tokens)
+        } else if (evento.tipo === 'tool_start') {
+          setMensajes(prev => [...prev, { rol: 'tool_call', contenido: evento.herramienta, parcial: true }])
         } else if (evento.tipo === 'fin') {
           guardarConversationId(evento.conversationId)
           setRefreshKey(k => k + 1)
           setMensajes(prev => {
-            const copia = [...prev]
+            const sinToolCalls = prev.filter(m => m.rol !== 'tool_call')
+            const copia = [...sinToolCalls]
             copia[copia.length - 1] = { ...copia[copia.length - 1], parcial: false, id: evento.assistantMessageId ?? copia[copia.length - 1].id }
             return copia
           })
         } else if (evento.tipo === 'error') {
           setError(evento.mensaje)
           setErrorStatus(evento.status ?? null)
-          setMensajes(prev => prev.slice(0, -1))
+          setMensajes(prev => prev.filter(m => m.rol !== 'tool_call').slice(0, -1))
         }
       })
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : 'Error de conexión'
       setError(mensaje)
       setErrorStatus(err instanceof HttpError ? err.status : null)
-      setMensajes(prev => prev.slice(0, -1))
+      setMensajes(prev => prev.filter(m => m.rol !== 'tool_call').slice(0, -1))
       // Al fallar la petición, limpiar el contador en vivo
       setTokensLive(null)
     } finally {

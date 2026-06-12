@@ -181,6 +181,10 @@ async function chat(idConversacion, mensajeUsuario, onChunk) {
       break
     }
 
+    toolCalls.forEach(llamada => {
+      onChunk?.({ tipo: 'tool_start', herramienta: llamada.function.name })
+    })
+
     const resultadosHerramientas = await Promise.all(
       toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
     )

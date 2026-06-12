@@ -16,6 +16,8 @@ async function chat(req, res, next) {
         enviarEvento({ tipo: 'chunk', texto: payload })
       } else if (payload && payload.tipo === 'usage') {
         enviarEvento({ tipo: 'usage', tokens: payload.tokens })
+      } else if (payload && payload.tipo === 'tool_start') {
+        enviarEvento({ tipo: 'tool_start', herramienta: payload.herramienta })
       }
     }
 

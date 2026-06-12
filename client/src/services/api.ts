@@ -46,6 +46,7 @@ export type EventoSSE =
   | { tipo: 'fin'; conversationId: string; assistantMessageId?: string }
   | { tipo: 'usage'; tokens: number }
   | { tipo: 'error'; mensaje: string; status?: number }
+  | { tipo: 'tool_start'; herramienta: string }
 
 export type FeedbackValor = 'up' | 'down'
 

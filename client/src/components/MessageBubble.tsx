@@ -1,4 +1,4 @@
-import { Box, Paper, IconButton } from '@mui/material'
+import { Box, Paper, IconButton, Chip, CircularProgress } from '@mui/material'
 import ReactMarkdown from 'react-markdown'
 import type { Mensaje, FeedbackValor } from '../hooks/useChat'
 
@@ -7,7 +7,27 @@ interface Props {
   onFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
 }
 
+const NOMBRE_HERRAMIENTA: Record<string, string> = {
+  get_exchange_rates: 'cotizaciones',
+  generate_session_report: 'reporte de sesión',
+}
+
 export function MessageBubble({ mensaje, onFeedback }: Props) {
+  if (mensaje.rol === 'tool_call') {
+    const nombre = NOMBRE_HERRAMIENTA[mensaje.contenido] ?? mensaje.contenido
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', my: 0.5 }}>
+        <Chip
+          icon={<CircularProgress size={12} sx={{ color: 'inherit !important' }} />}
+          label={`Consultando ${nombre}…`}
+          size="small"
+          variant="outlined"
+          sx={{ fontSize: '0.7rem', fontStyle: 'italic', color: 'text.secondary', borderColor: 'divider' }}
+        />
+      </Box>
+    )
+  }
+
   const esUsuario = mensaje.rol === 'user'
   const puedeDarFeedback = !esUsuario && !mensaje.parcial && mensaje.id
 
