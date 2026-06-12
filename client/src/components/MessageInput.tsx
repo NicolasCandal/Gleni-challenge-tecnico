@@ -4,9 +4,10 @@ import { Box, TextField, Button } from '@mui/material'
 interface Props {
   onEnviar: (texto: string) => void
   deshabilitado: boolean
+  rateLimited?: boolean
 }
 
-export function MessageInput({ onEnviar, deshabilitado }: Props) {
+export function MessageInput({ onEnviar, deshabilitado, rateLimited = false }: Props) {
   const [texto, setTexto] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -45,8 +46,8 @@ export function MessageInput({ onEnviar, deshabilitado }: Props) {
         value={texto}
         onChange={e => setTexto(e.target.value)}
         onKeyDown={manejarTecla}
-        disabled={deshabilitado}
-        placeholder="Escribí tu consulta... (Enter para enviar)"
+        disabled={deshabilitado || rateLimited}
+        placeholder={rateLimited ? 'Límite alcanzado, esperá un momento…' : 'Escribí tu consulta... (Enter para enviar)'}
         multiline
         maxRows={4}
         size="small"
@@ -65,7 +66,7 @@ export function MessageInput({ onEnviar, deshabilitado }: Props) {
       <Button
         variant="contained"
         onClick={enviar}
-        disabled={deshabilitado || !texto.trim()}
+        disabled={deshabilitado || rateLimited || !texto.trim()}
         aria-label="Enviar consulta"
         sx={{ borderRadius: '12px', px: 2, py: 1, flexShrink: 0, textTransform: 'none' }}
       >

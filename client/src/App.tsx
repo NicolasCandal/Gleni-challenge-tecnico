@@ -31,7 +31,7 @@ function useDarkMode() {
 }
 
 export default function App() {
-  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, conversationId, refreshKey, enviar, enviarFeedback, resetear } = useChat()
+  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited, conversationId, refreshKey, enviar, enviarFeedback, resetear } = useChat()
   const { dark, toggle } = useDarkMode()
 
   const muiTheme = useMemo(
@@ -93,7 +93,7 @@ export default function App() {
             </Alert>
           )}
 
-          <MessageInput onEnviar={enviar} deshabilitado={cargando} />
+          <MessageInput onEnviar={enviar} deshabilitado={cargando} rateLimited={rateLimited} />
         </Box>
 
         <ToolPanel conversationId={conversationId} refreshKey={refreshKey} tokensLive={tokensLive} dark={dark} />

@@ -66,12 +66,14 @@ export async function enviarFeedbackMensaje(messageId: string, feedback: Feedbac
 export async function fetchStream(
   conversationId: string | null,
   mensaje: string,
-  onEvento: (evento: EventoSSE) => void
+  onEvento: (evento: EventoSSE) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const respuesta = await fetch(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...(conversationId ? { conversationId } : {}), mensaje })
+    body: JSON.stringify({ ...(conversationId ? { conversationId } : {}), mensaje }),
+    signal,
   })
 
   if (!respuesta.ok) {
