@@ -9,7 +9,7 @@ interface Props {
 
 const NOMBRE_HERRAMIENTA: Record<string, string> = {
   get_exchange_rates: 'cotizaciones',
-  generate_session_report: 'reporte de sesión',
+  generate_session_report: 'reporte de sesion',
 }
 
 export function MessageBubble({ mensaje, onFeedback }: Props) {
@@ -19,7 +19,7 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 0.5 }}>
         <Chip
           icon={<CircularProgress size={12} sx={{ color: 'inherit !important' }} />}
-          label={`Consultando ${nombre}…`}
+          label={'Consultando ' + nombre + '...'}
           size="small"
           variant="outlined"
           sx={{ fontSize: '0.7rem', fontStyle: 'italic', color: 'text.secondary', borderColor: 'divider' }}
@@ -29,11 +29,51 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
   }
 
   const esUsuario = mensaje.rol === 'user'
+  const esPensando = !esUsuario && mensaje.parcial === true && mensaje.contenido === ''
   const puedeDarFeedback = !esUsuario && !mensaje.parcial && mensaje.id
 
   const manejarFeedback = async (feedback: FeedbackValor) => {
     if (!mensaje.id) return
     await onFeedback(mensaje.id, feedback)
+  }
+
+  if (esPensando) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+        <Paper
+          elevation={1}
+          role="status"
+          aria-label="El asistente esta procesando"
+          sx={{
+            borderRadius: '1rem',
+            borderBottomLeftRadius: '0.25rem',
+            px: 2,
+            py: 1.25,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+          }}
+        >
+          {[0, 1, 2].map(i => (
+            <Box
+              key={i}
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                bgcolor: 'text.disabled',
+                animation: 'bounce 1.2s ease-in-out infinite',
+                animationDelay: (i * 0.2) + 's',
+                '@keyframes bounce': {
+                  '0%, 80%, 100%': { transform: 'scale(0.7)', opacity: 0.4 },
+                  '40%': { transform: 'scale(1)', opacity: 1 },
+                },
+              }}
+            />
+          ))}
+        </Paper>
+      </Box>
+    )
   }
 
   return (
@@ -92,13 +132,13 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
               component="footer"
               sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}
               role="group"
-              aria-label="Herramientas de retroalimentación"
+              aria-label="Herramientas de retroalimentacion"
             >
               <IconButton
                 size="small"
                 onClick={() => manejarFeedback('up')}
                 disabled={mensaje.feedback === 'up'}
-                aria-label="Marcar respuesta como útil"
+                aria-label="Marcar respuesta como util"
                 aria-pressed={mensaje.feedback === 'up'}
                 sx={{
                   '&.Mui-disabled': {
@@ -114,7 +154,7 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
                 size="small"
                 onClick={() => manejarFeedback('down')}
                 disabled={mensaje.feedback === 'down'}
-                aria-label="Marcar respuesta como no útil"
+                aria-label="Marcar respuesta como no util"
                 aria-pressed={mensaje.feedback === 'down'}
                 sx={{
                   '&.Mui-disabled': {
