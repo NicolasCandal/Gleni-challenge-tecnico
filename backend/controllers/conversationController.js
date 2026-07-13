@@ -19,4 +19,14 @@ async function listarConversaciones(req, res, next) {
   }
 }
 
-module.exports = { listarConversaciones }
+async function eliminarConversacion(req, res, next) {
+  try {
+    const { id } = req.params
+    await repositorioConversacion.eliminar(id)
+    res.status(204).end()
+  } catch (err) {
+    next(err)
+  }
+}
+
+module.exports = { listarConversaciones, eliminarConversacion }

@@ -33,4 +33,15 @@ async function actualizarTitulo(id, titulo) {
   if (error) throw error
 }
 
-module.exports = { crear, listar, actualizarTitulo }
+
+
+async function eliminar(id) {
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+module.exports = { crear, listar, actualizarTitulo, eliminar }

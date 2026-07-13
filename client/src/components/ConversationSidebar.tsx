@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Box,
   Divider,
@@ -9,6 +10,7 @@ import {
   Typography,
 } from '@mui/material'
 import AddCommentOutlinedIcon from '@mui/icons-material/AddCommentOutlined'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import { ConversacionLocal } from '../hooks/useChat'
 
 interface Props {
@@ -16,6 +18,7 @@ interface Props {
   conversationIdActivo: string | null
   onSeleccionar: (id: string) => void
   onNueva: () => void
+  onEliminar: (id: string) => void
   dark: boolean
 }
 
@@ -34,7 +37,8 @@ function formatearFecha(iso: string): string {
   return fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
 }
 
-export function ConversationSidebar({ conversaciones, conversationIdActivo, onSeleccionar, onNueva, dark }: Props) {
+export function ConversationSidebar({ conversaciones, conversationIdActivo, onSeleccionar, onNueva, onEliminar, dark }: Props) {
+  const [hoverId, setHoverId] = useState<string | null>(null)
   const ordenadas = [...conversaciones].reverse()
 
   return (
@@ -66,12 +70,7 @@ export function ConversationSidebar({ conversaciones, conversationIdActivo, onSe
           Conversaciones
         </Typography>
         <Tooltip title="Nueva conversacion">
-          <IconButton
-            size="small"
-            onClick={onNueva}
-            aria-label="Nueva conversacion"
-            color="primary"
-          >
+          <IconButton size="small" onClick={onNueva} aria-label="Nueva conversacion" color="primary">
             <AddCommentOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -92,10 +91,13 @@ export function ConversationSidebar({ conversaciones, conversationIdActivo, onSe
               key={conv.id}
               selected={conv.id === conversationIdActivo}
               onClick={() => onSeleccionar(conv.id)}
+              onMouseEnter={() => setHoverId(conv.id)}
+              onMouseLeave={() => setHoverId(null)}
               sx={{
                 py: 0.75,
                 px: 1.5,
                 alignItems: 'flex-start',
+                pr: 0.5,
                 '&.Mui-selected': {
                   bgcolor: dark ? 'primary.dark' : 'primary.light',
                   '&:hover': { bgcolor: dark ? 'primary.dark' : 'primary.light' },
@@ -117,6 +119,18 @@ export function ConversationSidebar({ conversaciones, conversationIdActivo, onSe
                   },
                 }}
               />
+              {hoverId === conv.id && (
+                <Tooltip title="Eliminar">
+                  <IconButton
+                    size="small"
+                    aria-label="Eliminar conversacion"
+                    onClick={e => { e.stopPropagation(); onEliminar(conv.id) }}
+                    sx={{ ml: 0.5, flexShrink: 0, color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </ListItemButton>
           ))
         )}

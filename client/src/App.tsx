@@ -31,7 +31,7 @@ function useDarkMode() {
 }
 
 export default function App() {
-  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited, conversationId, conversaciones, refreshKey, enviar, enviarFeedback, resetear, seleccionarConversacion } = useChat()
+  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited, conversationId, conversaciones, refreshKey, enviar, enviarFeedback, resetear, seleccionarConversacion, eliminarConversacion } = useChat()
   const { dark, toggle } = useDarkMode()
 
   const muiTheme = useMemo(
@@ -55,6 +55,7 @@ export default function App() {
           conversationIdActivo={conversationId}
           onSeleccionar={seleccionarConversacion}
           onNueva={resetear}
+          onEliminar={eliminarConversacion}
           dark={dark}
         />
 

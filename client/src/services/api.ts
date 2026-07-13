@@ -125,3 +125,10 @@ export async function fetchStream(
     }
   }
 }
+
+export async function deleteConversacion(id: string): Promise<void> {
+  const respuesta = await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
+  if (!respuesta.ok && respuesta.status !== 404) {
+    throw new HttpError(respuesta.status, `Error al eliminar conversacion (${respuesta.status})`)
+  }
+}

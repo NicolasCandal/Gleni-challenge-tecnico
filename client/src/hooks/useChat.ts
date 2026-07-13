@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { fetchStream, fetchMensajes, fetchConversaciones, HttpError, enviarFeedbackMensaje } from '../services/api'
+import { fetchStream, fetchMensajes, fetchConversaciones, deleteConversacion, HttpError, enviarFeedbackMensaje } from '../services/api'
 
 export type Rol = 'user' | 'assistant' | 'tool_call'
 export type FeedbackValor = 'up' | 'down'
@@ -33,6 +33,7 @@ export interface EstadoChat {
   enviarFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
   resetear: () => void
   seleccionarConversacion: (id: string) => Promise<void>
+  eliminarConversacion: (id: string) => Promise<void>
 }
 
 const CLAVE_CONVERSACIONES = 'asesor_conversaciones'
@@ -238,6 +239,46 @@ export function useChat(): EstadoChat {
     setTokensLive(null)
   }, [])
 
+  const eliminarConversacion = useCallback(async (id: string) => {
+    // Optimistic: remove from local state first
+    setConversaciones(prev => {
+      const actualizadas = prev.filter(c => c.id !== id)
+      guardarConversacionesEnStorage(actualizadas)
+      return actualizadas
+    })
+
+    // If it was active, switch to the most recent remaining or reset
+    if (id === conversationId) {
+      setConversaciones(prev => {
+        const restantes = prev // already filtered above
+        const siguiente = restantes.at(-1)
+        if (siguiente) {
+          setConversationId(siguiente.id)
+          setMensajes([])
+          setRefreshKey(0)
+          setCargandoConversation(true)
+          fetchMensajes(siguiente.id).then(filas => {
+            if (filas.length > 0) {
+              setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
+              setRefreshKey(k => k + 1)
+            }
+          }).finally(() => setCargandoConversation(false))
+        } else {
+          setConversationId(null)
+          setMensajes([])
+          setRefreshKey(0)
+        }
+        return prev
+      })
+    }
+
+    // Fire and forget: delete from backend
+    deleteConversacion(id).catch(err => {
+      console.error('Error al eliminar conversacion en backend:', err.message)
+    })
+  }, [conversationId])
+
+
   const enviarFeedback = useCallback(async (messageId: string, feedback: FeedbackValor) => {
     const mensajeAnterior = mensajes.find(m => m.id === messageId)
     if (!mensajeAnterior) return
@@ -267,5 +308,6 @@ export function useChat(): EstadoChat {
     enviarFeedback,
     resetear,
     seleccionarConversacion,
+    eliminarConversacion,
   }
 }
