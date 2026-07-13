@@ -10,6 +10,7 @@ interface Props {
 const NOMBRE_HERRAMIENTA: Record<string, string> = {
   get_exchange_rates: 'cotizaciones',
   get_euro_rate: 'cotizacion del euro',
+  get_brl_rate: 'cotizacion del real brasileno',
   generate_session_report: 'reporte de sesion',
 }
 
