@@ -7,6 +7,7 @@ const cors = require('cors')
 const chatRoutes = require('./routes/chatRoutes')
 const sessionRoutes = require('./routes/sessionRoutes')
 const messageRoutes = require('./routes/messageRoutes')
+const conversationRoutes = require('./routes/conversationRoutes')
 const errorMiddleware = require('./middlewares/errorMiddleware')
 
 const app = express()
@@ -27,6 +28,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/chat', chatRoutes)
 app.use('/api/sessions', sessionRoutes)
 app.use('/api/messages', messageRoutes)
+app.use('/api/conversations', conversationRoutes)
 
 app.use(errorMiddleware)
 

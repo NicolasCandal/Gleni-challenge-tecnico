@@ -6,7 +6,7 @@ async function chat(req, res, next) {
   res.setHeader('Cache-Control', 'no-cache')
 
   const enviarEvento = (evento) => {
-    res.write(`data: ${JSON.stringify(evento)}\n\n`)
+    res.write('data: ' + JSON.stringify(evento) + '\n\n')
   }
 
   try {
@@ -14,7 +14,7 @@ async function chat(req, res, next) {
 
     const resultado = await servicioAgente.chat(conversationId ?? null, mensaje, enviarEvento)
 
-    enviarEvento(eventoFin(resultado.conversationId, resultado.assistantMessageId))
+    enviarEvento(eventoFin(resultado.conversationId, resultado.assistantMessageId, resultado.titulo))
     res.end()
   } catch (err) {
     enviarEvento(eventoError(err.message || 'Error interno del servidor', err.status || 500))

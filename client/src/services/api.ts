@@ -1,5 +1,5 @@
-// Las rutas son relativas: en producción frontend y backend comparten dominio en Vercel;
-// en desarrollo el proxy de vite.config.ts reenvía /api → http://localhost:3000.
+// Las rutas son relativas: en produccion frontend y backend comparten dominio en Vercel;
+// en desarrollo el proxy de vite.config.ts reenvia /api -> http://localhost:3000.
 
 export interface EjecucionHerramienta {
   id: string
@@ -34,6 +34,20 @@ export async function fetchMensajes(conversationId: string): Promise<MensajeDTO[
   return mensajes ?? []
 }
 
+export interface ConversacionDTO {
+  id: string
+  titulo: string | null
+  creadoEn: string
+}
+
+export async function fetchConversaciones(ids: string[]): Promise<ConversacionDTO[]> {
+  if (ids.length === 0) return []
+  const respuesta = await fetch(`/api/conversations?ids=${ids.join(',')}`)
+  if (!respuesta.ok) return []
+  const { conversaciones } = await respuesta.json()
+  return conversaciones ?? []
+}
+
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -43,7 +57,7 @@ export class HttpError extends Error {
 
 export type EventoSSE =
   | { tipo: 'chunk'; texto: string }
-  | { tipo: 'fin'; conversationId: string; assistantMessageId?: string }
+  | { tipo: 'fin'; conversationId: string; assistantMessageId?: string; titulo?: string | null }
   | { tipo: 'usage'; tokens: number }
   | { tipo: 'error'; mensaje: string; status?: number }
   | { tipo: 'tool_start'; herramienta: string }
@@ -78,15 +92,15 @@ export async function fetchStream(
 
   if (!respuesta.ok) {
     const mensajesPorCodigo: Record<number, string> = {
-      429: 'Límite de consultas alcanzado. Esperá un momento antes de volver a intentar.',
-      503: 'La API de cotizaciones no está disponible en este momento.',
-      500: 'Error interno del servidor. Intentá de nuevo en unos segundos.',
+      429: 'Limite de consultas alcanzado. Espera un momento antes de volver a intentar.',
+      503: 'La API de cotizaciones no esta disponible en este momento.',
+      500: 'Error interno del servidor. Intenta de nuevo en unos segundos.',
     }
     const textoError = mensajesPorCodigo[respuesta.status] ?? `Error inesperado (${respuesta.status})`
     throw new HttpError(respuesta.status, textoError)
   }
 
-  if (!respuesta.body) throw new Error('El servidor no devolvió un stream')
+  if (!respuesta.body) throw new Error('El servidor no devolvio un stream')
 
   const lector = respuesta.body.getReader()
   const decodificador = new TextDecoder()
@@ -106,7 +120,7 @@ export async function fetchStream(
         const evento = JSON.parse(linea.slice(6)) as EventoSSE
         onEvento(evento)
       } catch {
-        // ignorar líneas malformadas
+        // ignorar lineas malformadas
       }
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { fetchStream, fetchMensajes, HttpError, enviarFeedbackMensaje } from '../services/api'
+import { fetchStream, fetchMensajes, fetchConversaciones, HttpError, enviarFeedbackMensaje } from '../services/api'
 
 export type Rol = 'user' | 'assistant' | 'tool_call'
 export type FeedbackValor = 'up' | 'down'
@@ -12,6 +12,12 @@ export interface Mensaje {
   feedback?: FeedbackValor | null
 }
 
+export interface ConversacionLocal {
+  id: string
+  titulo: string | null
+  creadoEn: string
+}
+
 export interface EstadoChat {
   mensajes: Mensaje[]
   cargando: boolean
@@ -21,23 +27,50 @@ export interface EstadoChat {
   errorStatus: number | null
   rateLimited: boolean
   conversationId: string | null
+  conversaciones: ConversacionLocal[]
   refreshKey: number
   enviar: (texto: string) => Promise<void>
   enviarFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
   resetear: () => void
+  seleccionarConversacion: (id: string) => Promise<void>
 }
 
-const CLAVE_CONVERSATION_ID = 'asesor_conversation_id'
+const CLAVE_CONVERSACIONES = 'asesor_conversaciones'
 const CLAVE_RATE_LIMIT = 'asesor_rate_limited_at'
 
+function cargarConversaciones(): ConversacionLocal[] {
+  try {
+    const raw = localStorage.getItem(CLAVE_CONVERSACIONES)
+    if (raw) return JSON.parse(raw) as ConversacionLocal[]
+    // Migracion desde clave antigua
+    const oldId = localStorage.getItem('asesor_conversation_id')
+    if (oldId) {
+      const migradas: ConversacionLocal[] = [{ id: oldId, titulo: null, creadoEn: new Date().toISOString() }]
+      localStorage.setItem(CLAVE_CONVERSACIONES, JSON.stringify(migradas))
+      localStorage.removeItem('asesor_conversation_id')
+      return migradas
+    }
+    return []
+  } catch {
+    return []
+  }
+}
+
+function guardarConversacionesEnStorage(conversaciones: ConversacionLocal[]) {
+  localStorage.setItem(CLAVE_CONVERSACIONES, JSON.stringify(conversaciones))
+}
+
 export function useChat(): EstadoChat {
+  const conversacionesIniciales = useRef(cargarConversaciones())
+
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [cargando, setCargando] = useState(false)
   const [cargandoConversation, setCargandoConversation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
+  const [conversaciones, setConversaciones] = useState<ConversacionLocal[]>(conversacionesIniciales.current)
   const [conversationId, setConversationId] = useState<string | null>(
-    () => localStorage.getItem(CLAVE_CONVERSATION_ID)
+    () => conversacionesIniciales.current.at(-1)?.id ?? null
   )
   const [tokensLive, setTokensLive] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -61,12 +94,31 @@ export function useChat(): EstadoChat {
     return () => clearTimeout(t)
   }, [rateLimitedAt])
 
-  // Al montar, si hay una conversación guardada, recuperar su historial
+  // Al montar: sincronizar titulos y cargar historial de la conversacion activa
   useEffect(() => {
-    if (!conversationId) return
+    const convs = conversacionesIniciales.current
+    if (convs.length === 0) return
+
+    // Sincronizar titulos desde el backend
+    fetchConversaciones(convs.map(c => c.id)).then(remotas => {
+      if (remotas.length === 0) return
+      const mapaRemoto = Object.fromEntries(remotas.map(r => [r.id, r]))
+      setConversaciones(prev => {
+        const actualizadas = prev.map(c => ({
+          ...c,
+          titulo: mapaRemoto[c.id]?.titulo ?? c.titulo,
+        }))
+        guardarConversacionesEnStorage(actualizadas)
+        return actualizadas
+      })
+    }).catch(() => { /* silencioso */ })
+
+    // Cargar historial de la conversacion activa (la ultima)
+    const idActivo = convs.at(-1)?.id
+    if (!idActivo) return
 
     setCargandoConversation(true)
-    fetchMensajes(conversationId).then(filas => {
+    fetchMensajes(idActivo).then(filas => {
       if (filas.length === 0) return
       setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
       setRefreshKey(k => k + 1)
@@ -74,10 +126,44 @@ export function useChat(): EstadoChat {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const guardarConversationId = (id: string) => {
+  const agregarOActualizarConversacion = useCallback((id: string, titulo: string | null) => {
+    setConversaciones(prev => {
+      const existe = prev.find(c => c.id === id)
+      let actualizadas: ConversacionLocal[]
+      if (existe) {
+        actualizadas = prev.map(c => c.id === id ? { ...c, titulo: titulo ?? c.titulo } : c)
+      } else {
+        actualizadas = [...prev, { id, titulo, creadoEn: new Date().toISOString() }]
+      }
+      guardarConversacionesEnStorage(actualizadas)
+      return actualizadas
+    })
+  }, [])
+
+  const seleccionarConversacion = useCallback(async (id: string) => {
+    if (id === conversationId) return
+    abortRef.current?.abort()
+    abortRef.current = null
     setConversationId(id)
-    localStorage.setItem(CLAVE_CONVERSATION_ID, id)
-  }
+    setMensajes([])
+    setError(null)
+    setErrorStatus(null)
+    setRefreshKey(0)
+    setTokensLive(null)
+
+    setCargandoConversation(true)
+    try {
+      const filas = await fetchMensajes(id)
+      if (filas.length > 0) {
+        setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
+        setRefreshKey(k => k + 1)
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setCargandoConversation(false)
+    }
+  }, [conversationId])
 
   const enviar = useCallback(async (texto: string) => {
     if (!texto.trim() || cargando) return
@@ -88,7 +174,6 @@ export function useChat(): EstadoChat {
 
     setMensajes(prev => [...prev, { rol: 'user', contenido: texto }])
     setMensajes(prev => [...prev, { rol: 'assistant', contenido: '', parcial: true, feedback: null }])
-    // Inicializar contador de tokens en cuanto se envía la consulta
     setTokensLive(0)
 
     const controller = new AbortController()
@@ -110,7 +195,9 @@ export function useChat(): EstadoChat {
         } else if (evento.tipo === 'tool_start') {
           setMensajes(prev => [...prev, { rol: 'tool_call', contenido: evento.herramienta, parcial: true }])
         } else if (evento.tipo === 'fin') {
-          guardarConversationId(evento.conversationId)
+          const nuevoId = evento.conversationId
+          setConversationId(nuevoId)
+          agregarOActualizarConversacion(nuevoId, evento.titulo ?? null)
           setRefreshKey(k => k + 1)
           setMensajes(prev => {
             const sinToolCalls = prev.filter(m => m.rol !== 'tool_call')
@@ -127,32 +214,28 @@ export function useChat(): EstadoChat {
       }, controller.signal)
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
-      const mensaje = err instanceof Error ? err.message : 'Error de conexión'
+      const mensaje = err instanceof Error ? err.message : 'Error de conexion'
       const status = err instanceof HttpError ? err.status : null
       setError(mensaje)
       setErrorStatus(status)
       if (status === 429) setRateLimitedAt(Date.now())
       setMensajes(prev => prev.filter(m => m.rol !== 'tool_call').slice(0, -1))
-      // Al fallar la petición, limpiar el contador en vivo
       setTokensLive(null)
     } finally {
       abortRef.current = null
       setCargando(false)
     }
-  }, [conversationId, cargando])
+  }, [conversationId, cargando, agregarOActualizarConversacion])
 
   const resetear = useCallback(() => {
     abortRef.current?.abort()
     abortRef.current = null
-    setCargandoConversation(true)
-    localStorage.removeItem(CLAVE_CONVERSATION_ID)
     setConversationId(null)
     setMensajes([])
     setError(null)
     setErrorStatus(null)
     setRefreshKey(0)
-    // Mantener el loader visible un breve momento para la transición
-    setTimeout(() => setCargandoConversation(false), 300)
+    setTokensLive(null)
   }, [])
 
   const enviarFeedback = useCallback(async (messageId: string, feedback: FeedbackValor) => {
@@ -169,5 +252,20 @@ export function useChat(): EstadoChat {
     }
   }, [mensajes])
 
-  return { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited: rateLimitedAt !== null, conversationId, refreshKey, enviar, enviarFeedback, resetear }
+  return {
+    mensajes,
+    cargando,
+    cargandoConversation,
+    tokensLive,
+    error,
+    errorStatus,
+    rateLimited: rateLimitedAt !== null,
+    conversationId,
+    conversaciones,
+    refreshKey,
+    enviar,
+    enviarFeedback,
+    resetear,
+    seleccionarConversacion,
+  }
 }

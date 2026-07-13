@@ -3,6 +3,7 @@ import { useChat } from './hooks/useChat'
 import { ChatWindow } from './components/ChatWindow'
 import { MessageInput } from './components/MessageInput'
 import { ToolPanel } from './components/ToolPanel'
+import { ConversationSidebar } from './components/ConversationSidebar'
 import {
   Box,
   Alert,
@@ -10,7 +11,6 @@ import {
   CircularProgress,
   CssBaseline,
   Switch,
-  Button,
   AppBar,
   Toolbar,
   Typography,
@@ -31,7 +31,7 @@ function useDarkMode() {
 }
 
 export default function App() {
-  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited, conversationId, refreshKey, enviar, enviarFeedback, resetear } = useChat()
+  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited, conversationId, conversaciones, refreshKey, enviar, enviarFeedback, resetear, seleccionarConversacion } = useChat()
   const { dark, toggle } = useDarkMode()
 
   const muiTheme = useMemo(
@@ -49,6 +49,16 @@ export default function App() {
         role="application"
         aria-label="Aplicación Asesor de Cambio de Divisas"
       >
+        {/* Sidebar de conversaciones */}
+        <ConversationSidebar
+          conversaciones={conversaciones}
+          conversationIdActivo={conversationId}
+          onSeleccionar={seleccionarConversacion}
+          onNueva={resetear}
+          dark={dark}
+        />
+
+        {/* Área principal */}
         <Box component="main" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
           <AppBar position="static" color="default" elevation={1} component="header">
             <Toolbar variant="dense" sx={{ justifyContent: 'space-between' }}>
@@ -60,28 +70,16 @@ export default function App() {
                   Cotizaciones en tiempo real · dolarapi.com
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Switch
-                  checked={dark}
-                  onChange={toggle}
-                  size="small"
-                  slotProps={{
-                    input: {
-                      'aria-label': `Alternar modo oscuro (actualmente en ${dark ? 'oscuro' : 'claro'})`,
-                    },
-                  }}
-                />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={resetear}
-                  disabled={cargando}
-                  aria-label="Iniciar nueva conversación"
-                  sx={{ textTransform: 'none', borderRadius: 1.5 }}
-                >
-                  Nueva conversación
-                </Button>
-              </Box>
+              <Switch
+                checked={dark}
+                onChange={toggle}
+                size="small"
+                slotProps={{
+                  input: {
+                    'aria-label': `Alternar modo oscuro (actualmente en ${dark ? 'oscuro' : 'claro'})`,
+                  },
+                }}
+              />
             </Toolbar>
           </AppBar>
 

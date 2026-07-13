@@ -12,6 +12,10 @@ jest.mock('../backend/repositories/toolExecutionRepository', () => ({
   crear: jest.fn()
 }))
 
+jest.mock('../backend/repositories/conversationRepository', () => ({
+  actualizarTitulo: jest.fn()
+}))
+
 jest.mock('../backend/tools/getExchangeRates', () => ({
   definicion: {
     name: 'get_exchange_rates',
@@ -41,14 +45,13 @@ const repositorioEjecucion = require('../backend/repositories/toolExecutionRepos
 const herramientaGetExchangeRates = require('../backend/tools/getExchangeRates')
 
 const ID_CONV = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
-const TEXTO_RESPUESTA = 'El dólar blue cotiza a $1200.'
+const TEXTO_RESPUESTA = 'El dolar blue cotiza a $1200.'
 const RESULTADO_TOOL = { cotizaciones: [{ casa: 'blue', compra: 1190, venta: 1200 }] }
 
 async function* crearStream(chunks) {
   for (const chunk of chunks) yield chunk
 }
 
-// Stream 1: modelo decide usar get_exchange_rates
 const chunksConTool = [
   {
     choices: [{
@@ -65,7 +68,6 @@ const chunksConTool = [
   { usage: { total_tokens: 150 }, choices: [] }
 ]
 
-// Stream 2: modelo genera la respuesta final con el resultado de la tool
 const chunksConTexto = [
   { choices: [{ delta: { content: TEXTO_RESPUESTA } }] },
   { usage: { total_tokens: 320 }, choices: [] }
@@ -76,7 +78,7 @@ beforeEach(() => {
 
   servicioSesion.crearConversacion.mockResolvedValue({ id: ID_CONV })
   servicioSesion.agregarMensaje.mockImplementation(({ rol }) =>
-    Promise.resolve({ id: `msg-${rol}` })
+    Promise.resolve({ id: 'msg-' + rol })
   )
   servicioSesion.obtenerHistorial.mockResolvedValue([])
 
@@ -88,16 +90,14 @@ beforeEach(() => {
     .mockResolvedValueOnce(crearStream(chunksConTexto))
 })
 
-describe('agentService.chat — flujo con tool call', () => {
+describe('agentService.chat - flujo con tool call', () => {
   test('realiza dos llamadas a OpenAI cuando la primera devuelve tool_calls', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(clienteOpenAI.chat.completions.create).toHaveBeenCalledTimes(2)
   })
 
   test('ejecuta el manejador de la herramienta con los argumentos del stream', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(herramientaGetExchangeRates.manejador).toHaveBeenCalledWith(
       { rate_types: ['blue'] },
       { idConversacion: ID_CONV }
@@ -106,8 +106,7 @@ describe('agentService.chat — flujo con tool call', () => {
 
   test('emite tool_start por onChunk antes de ejecutar la herramienta', async () => {
     const onChunk = jest.fn()
-    await chat(ID_CONV, '¿cómo está el blue?', onChunk)
-
+    await chat(ID_CONV, 'como esta el blue?', onChunk)
     expect(onChunk).toHaveBeenCalledWith({
       tipo: 'tool_start',
       herramienta: 'get_exchange_rates'
@@ -115,36 +114,30 @@ describe('agentService.chat — flujo con tool call', () => {
   })
 
   test('la segunda llamada incluye el mensaje asistente con tool_calls y el resultado de la tool', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     const { messages } = clienteOpenAI.chat.completions.create.mock.calls[1][0]
     const roles = messages.map(m => m.role)
-
-    expect(roles).toContain('assistant') // mensaje que decidió usar la tool
-    expect(roles).toContain('tool')      // resultado devuelto por el manejador
+    expect(roles).toContain('assistant')
+    expect(roles).toContain('tool')
   })
 
   test('el mensaje tool en la segunda llamada contiene la salida del manejador', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     const { messages } = clienteOpenAI.chat.completions.create.mock.calls[1][0]
     const mensajeTool = messages.find(m => m.role === 'tool')
-
     expect(mensajeTool.tool_call_id).toBe('call_test_001')
     expect(JSON.parse(mensajeTool.content)).toEqual(RESULTADO_TOOL)
   })
 
   test('devuelve la respuesta de texto de la segunda llamada como respuesta final', async () => {
-    const resultado = await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    const resultado = await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(resultado.respuesta).toBe(TEXTO_RESPUESTA)
   })
 })
 
-describe('agentService.chat — persistencia', () => {
-  test('persiste la ejecución de la herramienta con nombre, entrada y salida', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+describe('agentService.chat - persistencia', () => {
+  test('persiste la ejecucion de la herramienta con nombre, entrada y salida', async () => {
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(repositorioEjecucion.crear).toHaveBeenCalledWith(
       expect.objectContaining({
         idConversacion: ID_CONV,
@@ -156,9 +149,8 @@ describe('agentService.chat — persistencia', () => {
     )
   })
 
-  test('persiste _turno con los tokens del turno que usó tools (150)', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+  test('persiste _turno con los tokens del turno que uso tools (150)', async () => {
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(repositorioEjecucion.crear).toHaveBeenCalledWith(
       expect.objectContaining({
         idConversacion: ID_CONV,
@@ -169,8 +161,7 @@ describe('agentService.chat — persistencia', () => {
   })
 
   test('persiste _turno con los tokens del turno final de texto (320)', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(repositorioEjecucion.crear).toHaveBeenCalledWith(
       expect.objectContaining({
         idConversacion: ID_CONV,
@@ -181,8 +172,7 @@ describe('agentService.chat — persistencia', () => {
   })
 
   test('persiste el mensaje del asistente con la respuesta final de texto', async () => {
-    await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(servicioSesion.agregarMensaje).toHaveBeenCalledWith(
       expect.objectContaining({
         idConversacion: ID_CONV,
@@ -193,10 +183,8 @@ describe('agentService.chat — persistencia', () => {
   })
 
   test('un fallo en la persistencia de la herramienta no interrumpe la respuesta', async () => {
-    repositorioEjecucion.crear.mockRejectedValueOnce(new Error('DB caída'))
-
-    const resultado = await chat(ID_CONV, '¿cómo está el blue?', jest.fn())
-
+    repositorioEjecucion.crear.mockRejectedValueOnce(new Error('DB caida'))
+    const resultado = await chat(ID_CONV, 'como esta el blue?', jest.fn())
     expect(resultado.respuesta).toBe(TEXTO_RESPUESTA)
   })
 })
