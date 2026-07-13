@@ -1,5 +1,5 @@
 const router = require('express').Router()
-const { listarConversaciones, eliminarConversacion } = require('../controllers/conversationController')
+const { listarConversaciones, actualizarTituloConversacion, eliminarConversacion } = require('../controllers/conversationController')
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -9,6 +9,7 @@ router.param('id', (req, res, next, id) => {
 })
 
 router.get('/', listarConversaciones)
+router.patch('/:id', actualizarTituloConversacion)
 router.delete('/:id', eliminarConversacion)
 
 module.exports = router

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { fetchStream, fetchMensajes, fetchConversaciones, deleteConversacion, HttpError, enviarFeedbackMensaje } from '../services/api'
+import { fetchStream, fetchMensajes, fetchConversaciones, deleteConversacion, updateConversacionTitulo, HttpError, enviarFeedbackMensaje } from '../services/api'
 
 export type Rol = 'user' | 'assistant' | 'tool_call'
 export type FeedbackValor = 'up' | 'down'
@@ -34,6 +34,7 @@ export interface EstadoChat {
   resetear: () => void
   seleccionarConversacion: (id: string) => Promise<void>
   eliminarConversacion: (id: string) => Promise<void>
+  renombrarConversacion: (id: string, titulo: string) => Promise<void>
 }
 
 const CLAVE_CONVERSACIONES = 'asesor_conversaciones'
@@ -279,6 +280,32 @@ export function useChat(): EstadoChat {
   }, [conversationId])
 
 
+  const renombrarConversacion = useCallback(async (id: string, titulo: string) => {
+    const tituloNormalizado = titulo.trim().slice(0, 100)
+    if (!tituloNormalizado) return
+
+    // Optimistic update
+    setConversaciones(prev => {
+      const actualizadas = prev.map(c => c.id === id ? { ...c, titulo: tituloNormalizado } : c)
+      guardarConversacionesEnStorage(actualizadas)
+      return actualizadas
+    })
+
+    try {
+      await updateConversacionTitulo(id, tituloNormalizado)
+    } catch (err) {
+      console.error('Error al renombrar conversacion:', err instanceof Error ? err.message : err)
+      // revert on error
+      setConversaciones(prev => {
+        const revertidas = prev.map(c =>
+          c.id === id ? { ...c, titulo: prev.find(x => x.id === id)?.titulo ?? c.titulo } : c
+        )
+        guardarConversacionesEnStorage(revertidas)
+        return revertidas
+      })
+    }
+  }, [])
+
   const enviarFeedback = useCallback(async (messageId: string, feedback: FeedbackValor) => {
     const mensajeAnterior = mensajes.find(m => m.id === messageId)
     if (!mensajeAnterior) return
@@ -309,5 +336,6 @@ export function useChat(): EstadoChat {
     resetear,
     seleccionarConversacion,
     eliminarConversacion,
+    renombrarConversacion,
   }
 }

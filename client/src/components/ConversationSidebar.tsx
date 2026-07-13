@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Box,
   Divider,
   IconButton,
+  InputBase,
   List,
   ListItemButton,
   ListItemText,
@@ -11,6 +12,7 @@ import {
 } from '@mui/material'
 import AddCommentOutlinedIcon from '@mui/icons-material/AddCommentOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import { ConversacionLocal } from '../hooks/useChat'
 
 interface Props {
@@ -19,6 +21,7 @@ interface Props {
   onSeleccionar: (id: string) => void
   onNueva: () => void
   onEliminar: (id: string) => void
+  onRenombrar: (id: string, titulo: string) => Promise<void>
   dark: boolean
 }
 
@@ -37,9 +40,40 @@ function formatearFecha(iso: string): string {
   return fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
 }
 
-export function ConversationSidebar({ conversaciones, conversationIdActivo, onSeleccionar, onNueva, onEliminar, dark }: Props) {
+export function ConversationSidebar({
+  conversaciones,
+  conversationIdActivo,
+  onSeleccionar,
+  onNueva,
+  onEliminar,
+  onRenombrar,
+  dark,
+}: Props) {
   const [hoverId, setHoverId] = useState<string | null>(null)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [textoEdicion, setTextoEdicion] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
   const ordenadas = [...conversaciones].reverse()
+
+  function iniciarEdicion(conv: ConversacionLocal) {
+    setEditandoId(conv.id)
+    setTextoEdicion(conv.titulo ?? 'Nueva conversacion')
+    // focus se aplica en el proximo render via autoFocus
+  }
+
+  function cancelarEdicion() {
+    setEditandoId(null)
+    setTextoEdicion('')
+  }
+
+  async function confirmarEdicion(id: string) {
+    const titulo = textoEdicion.trim()
+    cancelarEdicion()
+    if (titulo) {
+      await onRenombrar(id, titulo)
+    }
+  }
 
   return (
     <Box
@@ -66,7 +100,11 @@ export function ConversationSidebar({ conversaciones, conversationIdActivo, onSe
           minHeight: 48,
         }}
       >
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}
+        >
           Conversaciones
         </Typography>
         <Tooltip title="Nueva conversacion">
@@ -90,7 +128,9 @@ export function ConversationSidebar({ conversaciones, conversationIdActivo, onSe
             <ListItemButton
               key={conv.id}
               selected={conv.id === conversationIdActivo}
-              onClick={() => onSeleccionar(conv.id)}
+              onClick={() => {
+                if (editandoId !== conv.id) onSeleccionar(conv.id)
+              }}
               onMouseEnter={() => setHoverId(conv.id)}
               onMouseLeave={() => setHoverId(null)}
               sx={{
@@ -104,32 +144,75 @@ export function ConversationSidebar({ conversaciones, conversationIdActivo, onSe
                 },
               }}
             >
-              <ListItemText
-                primary={conv.titulo ?? 'Nueva conversacion'}
-                secondary={formatearFecha(conv.creadoEn)}
-                slotProps={{
-                  primary: {
-                    variant: 'body2',
-                    noWrap: true,
-                    sx: { fontWeight: conv.id === conversationIdActivo ? 600 : 400 },
-                  },
-                  secondary: {
-                    variant: 'caption',
-                    noWrap: true,
-                  },
-                }}
-              />
-              {hoverId === conv.id && (
-                <Tooltip title="Eliminar">
-                  <IconButton
-                    size="small"
-                    aria-label="Eliminar conversacion"
-                    onClick={e => { e.stopPropagation(); onEliminar(conv.id) }}
-                    sx={{ ml: 0.5, flexShrink: 0, color: 'text.secondary', '&:hover': { color: 'error.main' } }}
-                  >
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+              {editandoId === conv.id ? (
+                <InputBase
+                  inputRef={inputRef}
+                  value={textoEdicion}
+                  onChange={e => setTextoEdicion(e.target.value)}
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); confirmarEdicion(conv.id) }
+                    if (e.key === 'Escape') { e.preventDefault(); cancelarEdicion() }
+                  }}
+                  onBlur={() => confirmarEdicion(conv.id)}
+                  onClick={e => e.stopPropagation()}
+                  sx={{
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    px: 0.5,
+                    py: 0.25,
+                    borderRadius: 0.5,
+                    bgcolor: dark ? 'grey.800' : 'background.paper',
+                    border: 1,
+                    borderColor: 'primary.main',
+                    '& input': { p: 0 },
+                  }}
+                  inputProps={{ 'aria-label': 'Editar titulo de conversacion', maxLength: 100 }}
+                />
+              ) : (
+                <ListItemText
+                  primary={conv.titulo ?? 'Nueva conversacion'}
+                  secondary={formatearFecha(conv.creadoEn)}
+                  onDoubleClick={e => { e.stopPropagation(); iniciarEdicion(conv) }}
+                  slotProps={{
+                    primary: {
+                      variant: 'body2',
+                      noWrap: true,
+                      sx: { fontWeight: conv.id === conversationIdActivo ? 600 : 400 },
+                    },
+                    secondary: {
+                      variant: 'caption',
+                      noWrap: true,
+                    },
+                  }}
+                />
+              )}
+
+              {hoverId === conv.id && editandoId !== conv.id && (
+                <Box sx={{ display: 'flex', flexShrink: 0, ml: 0.5 }}>
+                  <Tooltip title="Renombrar">
+                    <IconButton
+                      size="small"
+                      aria-label="Renombrar conversacion"
+                      onClick={e => { e.stopPropagation(); iniciarEdicion(conv) }}
+                      sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                    >
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Eliminar">
+                    <IconButton
+                      size="small"
+                      aria-label="Eliminar conversacion"
+                      onClick={e => { e.stopPropagation(); onEliminar(conv.id) }}
+                      sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               )}
             </ListItemButton>
           ))

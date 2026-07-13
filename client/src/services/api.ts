@@ -77,6 +77,17 @@ export async function enviarFeedbackMensaje(messageId: string, feedback: Feedbac
   }
 }
 
+export async function updateConversacionTitulo(id: string, titulo: string): Promise<void> {
+  const respuesta = await fetch(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ titulo }),
+  })
+  if (!respuesta.ok) {
+    throw new HttpError(respuesta.status, `Error al actualizar titulo (${respuesta.status})`)
+  }
+}
+
 export async function fetchStream(
   conversationId: string | null,
   mensaje: string,

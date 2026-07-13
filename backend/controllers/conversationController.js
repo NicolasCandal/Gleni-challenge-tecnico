@@ -19,6 +19,23 @@ async function listarConversaciones(req, res, next) {
   }
 }
 
+async function actualizarTituloConversacion(req, res, next) {
+  try {
+    const { id } = req.params
+    const { titulo } = req.body
+
+    if (typeof titulo !== 'string' || titulo.trim().length === 0) {
+      return res.status(400).json({ error: 'El campo titulo es requerido y no puede estar vacio' })
+    }
+
+    const tituloNormalizado = titulo.trim().slice(0, 100)
+    await repositorioConversacion.actualizarTitulo(id, tituloNormalizado)
+    res.json({ id, titulo: tituloNormalizado })
+  } catch (err) {
+    next(err)
+  }
+}
+
 async function eliminarConversacion(req, res, next) {
   try {
     const { id } = req.params
@@ -29,4 +46,4 @@ async function eliminarConversacion(req, res, next) {
   }
 }
 
-module.exports = { listarConversaciones, eliminarConversacion }
+module.exports = { listarConversaciones, actualizarTituloConversacion, eliminarConversacion }
