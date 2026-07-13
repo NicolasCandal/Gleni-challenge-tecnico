@@ -1,6 +1,5 @@
 const getExchangeRates = require('./getExchangeRates')
-const getEuroRate = require('./getEuroRate')
-const getBrlRate = require('./getBrlRate')
+const getLatamRate = require('./getLatamRate')
 const generateReport = require('./generateReport')
 
-module.exports = [getExchangeRates, getEuroRate, getBrlRate, generateReport]
+module.exports = [getExchangeRates, getLatamRate, generateReport]
