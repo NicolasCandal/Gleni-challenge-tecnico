@@ -1,24 +1,24 @@
 jest.mock('../../backend/services/agentService', () => ({
-  chat: jest.fn().mockResolvedValue({ conversationId: 'test-id', respuesta: 'ok' })
+  chat: jest.fn().mockResolvedValue({ conversationId: 'test-id', response: 'ok' })
 }))
 
 const request = require('supertest')
 const app = require('../../backend/app')
 
-describe('Rate limiting en POST /api/chat', () => {
-  test('permite hasta 10 requests por minuto y bloquea el 11vo con 429', async () => {
-    const enviarRequest = () =>
+describe('POST /api/chat — rate limiting', () => {
+  test('allows ten requests per minute and rejects the eleventh with 429', async () => {
+    const sendRequest = () =>
       request(app)
         .post('/api/chat')
-        .send({ mensaje: 'test' })
+        .send({ message: 'test' })
 
     for (let i = 0; i < 10; i++) {
-      const res = await enviarRequest()
+      const res = await sendRequest()
       expect(res.status).toBe(200)
     }
 
-    const resLimitada = await enviarRequest()
-    expect(resLimitada.status).toBe(429)
-    expect(resLimitada.body.error).toMatch(/Demasiadas consultas/)
+    const limitedResponse = await sendRequest()
+    expect(limitedResponse.status).toBe(429)
+    expect(limitedResponse.body.error).toMatch(/Too many requests/)
   })
 })

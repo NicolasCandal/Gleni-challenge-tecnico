@@ -1,12 +1,12 @@
-function validar(esquema) {
+function validate(schema) {
   return (req, res, next) => {
-    const resultado = esquema.safeParse(req.body)
-    if (!resultado.success) {
-      return res.status(400).json({ error: resultado.error.errors })
+    const result = schema.safeParse(req.body)
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.errors })
     }
-    req.body = resultado.data
+    req.body = result.data
     next()
   }
 }
 
-module.exports = validar
+module.exports = validate

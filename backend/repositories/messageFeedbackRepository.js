@@ -1,10 +1,10 @@
 const supabase = require('../infrastructure/supabaseClient')
 
-async function crearOActualizar({ idMensaje, feedback }) {
+async function upsert({ messageId, feedback }) {
   const { data, error } = await supabase
     .from('feedback')
     .upsert(
-      { message_id: idMensaje, feedback },
+      { message_id: messageId, feedback },
       { onConflict: 'message_id' }
     )
     .select()
@@ -14,20 +14,20 @@ async function crearOActualizar({ idMensaje, feedback }) {
   return data
 }
 
-async function listarPorMensajes(idsMensajes) {
-  if (!idsMensajes || idsMensajes.length === 0) return {}
+async function listByMessages(messageIds) {
+  if (!messageIds || messageIds.length === 0) return {}
 
   const { data, error } = await supabase
     .from('feedback')
     .select('message_id, feedback')
-    .in('message_id', idsMensajes)
+    .in('message_id', messageIds)
 
   if (error) throw error
 
-  return (data ?? []).reduce((acumulado, fila) => {
-    acumulado[fila.message_id] = fila.feedback
-    return acumulado
+  return (data ?? []).reduce((accumulated, row) => {
+    accumulated[row.message_id] = row.feedback
+    return accumulated
   }, {})
 }
 
-module.exports = { crearOActualizar, listarPorMensajes }
+module.exports = { upsert, listByMessages }

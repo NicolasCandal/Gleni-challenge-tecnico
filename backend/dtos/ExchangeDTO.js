@@ -1,27 +1,27 @@
-function crearCotizacionBaseDTO({ casa, nombre, compra, venta, fechaActualizacion }) {
-  return { casa, nombre, compra, venta, fechaActualizacion }
+function createBaseQuoteDTO({ rateType, name, buy, sell, updatedAt }) {
+  return { rateType, name, buy, sell, updatedAt }
 }
 
-function crearReferenciaDTO({ tipoCambio, resultado }) {
-  return { tipoCambio, resultado }
+function createReferenceDTO({ exchangeRate, result }) {
+  return { exchangeRate, result }
 }
 
-function crearOperacionDTO({ lado, tipoCambio, resultado }) {
-  return { lado, tipoCambio, resultado }
+function createTransactionDTO({ side, exchangeRate, result }) {
+  return { side, exchangeRate, result }
 }
 
-function crearConversionDTO({ monto, direccion, tipoUsado, referencia, operacion }) {
+function createConversionDTO({ amount, direction, rateUsed, reference, transaction }) {
   return {
-    monto,
-    direccion,
-    tipoUsado,
-    referencia: crearReferenciaDTO(referencia),
-    operacion: crearOperacionDTO(operacion)
+    amount,
+    direction,
+    rateUsed,
+    reference: createReferenceDTO(reference),
+    transaction: createTransactionDTO(transaction)
   }
 }
 
-function crearSalidaCotizacionesDTO({ cotizaciones, conversion, omitidos, advertencia, fuente, timestamp }) {
-  return { cotizaciones, conversion, omitidos, advertencia, fuente, timestamp }
+function createExchangeOutputDTO({ quotes, conversion, omitted, warning, source, timestamp }) {
+  return { quotes, conversion, omitted, warning, source, timestamp }
 }
 
-module.exports = { crearCotizacionBaseDTO, crearReferenciaDTO, crearOperacionDTO, crearConversionDTO, crearSalidaCotizacionesDTO }
+module.exports = { createBaseQuoteDTO, createReferenceDTO, createTransactionDTO, createConversionDTO, createExchangeOutputDTO }

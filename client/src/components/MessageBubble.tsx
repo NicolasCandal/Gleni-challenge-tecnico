@@ -1,26 +1,26 @@
 import { Box, Paper, IconButton, Chip, CircularProgress } from '@mui/material'
 import ReactMarkdown from 'react-markdown'
-import type { Mensaje, FeedbackValor } from '../hooks/useChat'
+import type { Message, FeedbackValue } from '../hooks/useChat'
 
 interface Props {
-  mensaje: Mensaje
-  onFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
+  message: Message
+  onFeedback: (messageId: string, feedback: FeedbackValue) => Promise<void>
 }
 
-const NOMBRE_HERRAMIENTA: Record<string, string> = {
-  get_exchange_rates: 'cotizaciones',
-  get_latam_rate: 'cotizacion de moneda',
-  generate_session_report: 'reporte de sesion',
+const TOOL_LABELS: Record<string, string> = {
+  get_exchange_rates: 'dollar exchange rates',
+  get_latam_rate: 'currency exchange rate',
+  generate_session_report: 'session report',
 }
 
-export function MessageBubble({ mensaje, onFeedback }: Props) {
-  if (mensaje.rol === 'tool_call') {
-    const nombre = NOMBRE_HERRAMIENTA[mensaje.contenido] ?? mensaje.contenido
+export function MessageBubble({ message, onFeedback }: Props) {
+  if (message.role === 'tool_call') {
+    const name = TOOL_LABELS[message.content] ?? message.content
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 0.5 }}>
         <Chip
           icon={<CircularProgress size={12} sx={{ color: 'inherit !important' }} />}
-          label={'Consultando ' + nombre + '...'}
+          label={'Looking up ' + name + '...'}
           size="small"
           variant="outlined"
           sx={{ fontSize: '0.7rem', fontStyle: 'italic', color: 'text.secondary', borderColor: 'divider' }}
@@ -29,22 +29,22 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
     )
   }
 
-  const esUsuario = mensaje.rol === 'user'
-  const esPensando = !esUsuario && mensaje.parcial === true && mensaje.contenido === ''
-  const puedeDarFeedback = !esUsuario && !mensaje.parcial && mensaje.id
+  const isUser = message.role === 'user'
+  const isThinking = !isUser && message.partial === true && message.content === ''
+  const canGiveFeedback = !isUser && !message.partial && message.id
 
-  const manejarFeedback = async (feedback: FeedbackValor) => {
-    if (!mensaje.id) return
-    await onFeedback(mensaje.id, feedback)
+  const handleFeedback = async (feedback: FeedbackValue) => {
+    if (!message.id) return
+    await onFeedback(message.id, feedback)
   }
 
-  if (esPensando) {
+  if (isThinking) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
         <Paper
           elevation={1}
           role="status"
-          aria-label="El asistente esta procesando"
+          aria-label="The assistant is thinking"
           sx={{
             borderRadius: '1rem',
             borderBottomLeftRadius: '0.25rem',
@@ -78,8 +78,8 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
   }
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: esUsuario ? 'flex-end' : 'flex-start' }}>
-      {esUsuario ? (
+    <Box sx={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+      {isUser ? (
         <Box
           sx={{
             maxWidth: '75%',
@@ -92,11 +92,11 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
             fontSize: '0.875rem',
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
-            opacity: mensaje.parcial ? 0.8 : 1,
+            opacity: message.partial ? 0.8 : 1,
           }}
         >
-          {mensaje.contenido}
-          {mensaje.parcial && (
+          {message.content}
+          {message.partial && (
             <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-current align-middle animate-pulse rounded-sm" />
           )}
         </Box>
@@ -111,7 +111,7 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
             py: 1,
             fontSize: '0.875rem',
             wordBreak: 'break-word',
-            opacity: mensaje.parcial ? 0.8 : 1,
+            opacity: message.partial ? 0.8 : 1,
           }}
         >
           <ReactMarkdown
@@ -123,24 +123,24 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
             }}
           >
-            {mensaje.contenido}
+            {message.content}
           </ReactMarkdown>
-          {mensaje.parcial && (
+          {message.partial && (
             <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-current align-middle animate-pulse rounded-sm" />
           )}
-          {puedeDarFeedback && (
+          {canGiveFeedback && (
             <Box
               component="footer"
               sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}
               role="group"
-              aria-label="Herramientas de retroalimentacion"
+              aria-label="Response feedback"
             >
               <IconButton
                 size="small"
-                onClick={() => manejarFeedback('up')}
-                disabled={mensaje.feedback === 'up'}
-                aria-label="Marcar respuesta como util"
-                aria-pressed={mensaje.feedback === 'up'}
+                onClick={() => handleFeedback('up')}
+                disabled={message.feedback === 'up'}
+                aria-label="Mark response as helpful"
+                aria-pressed={message.feedback === 'up'}
                 sx={{
                   '&.Mui-disabled': {
                     opacity: 1,
@@ -153,10 +153,10 @@ export function MessageBubble({ mensaje, onFeedback }: Props) {
               </IconButton>
               <IconButton
                 size="small"
-                onClick={() => manejarFeedback('down')}
-                disabled={mensaje.feedback === 'down'}
-                aria-label="Marcar respuesta como no util"
-                aria-pressed={mensaje.feedback === 'down'}
+                onClick={() => handleFeedback('down')}
+                disabled={message.feedback === 'down'}
+                aria-label="Mark response as unhelpful"
+                aria-pressed={message.feedback === 'down'}
                 sx={{
                   '&.Mui-disabled': {
                     opacity: 1,

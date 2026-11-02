@@ -1,9 +1,9 @@
 const router = require('express').Router()
 const { chat } = require('../controllers/chatController')
-const validar = require('../middlewares/validateMiddleware')
-const { EsquemaChat } = require('../schemas/chatSchema')
-const { limitadorChat } = require('../middlewares/rateLimitMiddleware')
+const validate = require('../middlewares/validateMiddleware')
+const { ChatSchema } = require('../schemas/chatSchema')
+const { chatLimiter } = require('../middlewares/rateLimitMiddleware')
 
-router.post('/', limitadorChat, validar(EsquemaChat), chat)
+router.post('/', chatLimiter, validate(ChatSchema), chat)
 
 module.exports = router

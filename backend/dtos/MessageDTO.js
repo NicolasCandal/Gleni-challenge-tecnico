@@ -1,19 +1,19 @@
-function crearMensajeDTO({ id, role, content, created_at, feedback = null }) {
-  return { id, role, content, creadoEn: created_at, feedback }
+function createMessageDTO({ id, role, content, created_at, feedback = null }) {
+  return { id, role, content, createdAt: created_at, feedback }
 }
 
-// Normaliza la fila cruda de la tabla feedback a la forma pública de la entidad,
-// evitando exponer columnas internas (id, created_at, etc.).
-function crearFeedbackDTO({ message_id, feedback }) {
-  return { idMensaje: message_id, feedback }
+// Map the feedback row to its public representation,
+// excluding internal columns such as id and created_at.
+function createFeedbackDTO({ message_id, feedback }) {
+  return { messageId: message_id, feedback }
 }
 
-function crearRespuestaMensajesDTO(mensajes) {
-  return { mensajes }
+function createMessagesResponseDTO(messages) {
+  return { messages }
 }
 
-function crearRespuestaFeedbackDTO(feedback) {
-  return { feedback: crearFeedbackDTO(feedback) }
+function createFeedbackResponseDTO(feedback) {
+  return { feedback: createFeedbackDTO(feedback) }
 }
 
-module.exports = { crearMensajeDTO, crearFeedbackDTO, crearRespuestaMensajesDTO, crearRespuestaFeedbackDTO }
+module.exports = { createMessageDTO, createFeedbackDTO, createMessagesResponseDTO, createFeedbackResponseDTO }

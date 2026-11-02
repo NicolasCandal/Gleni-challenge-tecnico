@@ -1,13 +1,13 @@
 const request = require('supertest')
 const app = require('../backend/app')
-const repositorioFeedback = require('../backend/repositories/messageFeedbackRepository')
+const feedbackRepository = require('../backend/repositories/messageFeedbackRepository')
 
 jest.mock('../backend/repositories/messageFeedbackRepository', () => ({
-  crearOActualizar: jest.fn(async ({ idMensaje, feedback }) => ({ id: 'feedback-id', message_id: idMensaje, feedback }))
+  upsert: jest.fn(async ({ messageId, feedback }) => ({ id: 'feedback-id', message_id: messageId, feedback }))
 }))
 
 describe('POST /api/messages/:id/feedback', () => {
-  test('rechaza feedback inválido', async () => {
+  test('rejects invalid feedback', async () => {
     const res = await request(app)
       .post('/api/messages/123/feedback')
       .send({ feedback: 'meh' })
@@ -15,22 +15,22 @@ describe('POST /api/messages/:id/feedback', () => {
     expect(res.status).toBe(400)
   })
 
-  test('persiste feedback válido', async () => {
+  test('persists valid feedback without exposing database columns', async () => {
     const messageId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
     const res = await request(app)
       .post(`/api/messages/${messageId}/feedback`)
       .send({ feedback: 'up' })
 
     expect(res.status).toBe(201)
-    expect(repositorioFeedback.crearOActualizar).toHaveBeenCalledWith({
-      idMensaje: messageId,
+    expect(feedbackRepository.upsert).toHaveBeenCalledWith({
+      messageId: messageId,
       feedback: 'up'
     })
     expect(res.body.feedback).toEqual({
-      idMensaje: messageId,
+      messageId: messageId,
       feedback: 'up'
     })
-    // No debe filtrar columnas internas de la tabla feedback
+    // Internal feedback columns must not leak into the response.
     expect(res.body.feedback).not.toHaveProperty('id')
     expect(res.body.feedback).not.toHaveProperty('message_id')
   })

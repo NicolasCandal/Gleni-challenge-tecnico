@@ -1,67 +1,67 @@
-const { completarConStream } = require('../infrastructure/openaiStreamClient')
-const clienteOpenAI = require('../infrastructure/openaiClient')
-const servicioSesion = require('./sessionService')
-const repositorioEjecucion = require('../repositories/toolExecutionRepository')
-const repositorioConversacion = require('../repositories/conversationRepository')
-const { promptSistema } = require('../prompts/agentPrompt')
-const herramientas = require('../tools')
-const { eventoToolStart } = require('../dtos/ChatDTO')
+const { completeWithStream } = require('../infrastructure/openaiStreamClient')
+const openaiClient = require('../infrastructure/openaiClient')
+const sessionService = require('./sessionService')
+const toolExecutionRepository = require('../repositories/toolExecutionRepository')
+const conversationRepository = require('../repositories/conversationRepository')
+const { systemPrompt } = require('../prompts/agentPrompt')
+const tools = require('../tools')
+const { toolStartEvent } = require('../dtos/ChatDTO')
 
-const HERRAMIENTAS = Object.fromEntries(herramientas.map(t => [t.definicion.name, t.manejador]))
-const DEFINICIONES_HERRAMIENTAS = herramientas.map(t => ({ type: 'function', function: t.definicion }))
+const TOOL_HANDLERS = Object.fromEntries(tools.map(t => [t.definition.name, t.handler]))
+const TOOL_DEFINITIONS = tools.map(t => ({ type: 'function', function: t.definition }))
 
-const MAX_ITERACIONES_TOOLS = 4
+const MAX_TOOL_ITERATIONS = 4
 
-async function ejecutarHerramienta(llamada, idConversacion) {
-  const nombreHerramienta = llamada.function.name
-  const inicio = Date.now()
-  let entrada = null
-  let salida = null
-  let errorMsg = null
+async function executeTool(call, conversationId) {
+  const toolName = call.function.name
+  const start = Date.now()
+  let input = null
+  let output = null
+  let errorMessage = null
 
   try {
-    const manejador = HERRAMIENTAS[nombreHerramienta]
-    if (!manejador) throw new Error('herramienta desconocida: ' + nombreHerramienta)
+    const handler = TOOL_HANDLERS[toolName]
+    if (!handler) throw new Error('Unknown tool: ' + toolName)
 
-    entrada = JSON.parse(llamada.function.arguments)
-    salida = await manejador(entrada, { idConversacion })
+    input = JSON.parse(call.function.arguments)
+    output = await handler(input, { conversationId })
   } catch (err) {
-    errorMsg = err.message
+    errorMessage = err.message
   }
 
-  const latenciaMs = Date.now() - inicio
+  const latencyMs = Date.now() - start
 
   try {
-    await repositorioEjecucion.crear({
-      idConversacion,
-      nombreHerramienta,
-      entrada,
-      salida,
-      latenciaMs,
-      tokensUsados: null,
-      errorMsg
+    await toolExecutionRepository.create({
+      conversationId,
+      toolName,
+      input,
+      output,
+      latencyMs,
+      tokensUsed: null,
+      errorMessage
     })
-  } catch (errPersistencia) {
-    console.error('Error al persistir ejecucion de herramienta:', errPersistencia.message)
+  } catch (persistenceError) {
+    console.error('Could not save tool execution:', persistenceError.message)
   }
 
   return {
-    tool_call_id: llamada.id,
+    tool_call_id: call.id,
     role: 'tool',
-    content: errorMsg
-      ? JSON.stringify({ error: errorMsg })
-      : JSON.stringify(salida)
+    content: errorMessage
+      ? JSON.stringify({ error: errorMessage })
+      : JSON.stringify(output)
   }
 }
 
-async function generarTitulo(mensajeUsuario) {
+async function generateTitle(userMessage) {
   try {
-    const completion = await clienteOpenAI.chat.completions.create({
+    const completion = await openaiClient.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: [
         {
           role: 'user',
-          content: 'Genera un titulo muy corto (maximo 5 palabras, en espanol) que describa esta consulta sobre cambio de divisas. Solo devuelve el titulo, sin comillas ni puntuacion final.\n\nConsulta: "' + mensajeUsuario + '"'
+          content: 'Write a short English title (at most 5 words) for this currency exchange question. Return only the title, without quotation marks or a final period.\n\nQuestion: "' + userMessage + '"'
         }
       ],
       max_tokens: 20,
@@ -69,101 +69,101 @@ async function generarTitulo(mensajeUsuario) {
     })
     return completion.choices[0]?.message?.content?.trim() || null
   } catch (err) {
-    console.error('Error al generar titulo:', err.message)
+    console.error('Could not generate title:', err.message)
     return null
   }
 }
 
-async function chat(idConversacion, mensajeUsuario, onEvento) {
-  if (!idConversacion) {
-    const conversacion = await servicioSesion.crearConversacion()
-    idConversacion = conversacion.id
+async function chat(conversationId, userMessage, onEvent) {
+  if (!conversationId) {
+    const conversation = await sessionService.createConversation()
+    conversationId = conversation.id
   }
 
-  const mensajeUsuarioGuardado = await servicioSesion.agregarMensaje({ idConversacion, rol: 'user', contenido: mensajeUsuario })
+  const savedUserMessage = await sessionService.addMessage({ conversationId, role: 'user', content: userMessage })
 
-  const historial = await servicioSesion.obtenerHistorial(idConversacion)
-  const esFirstExchange = historial.length === 1
-  let mensajes = [{ role: 'system', content: promptSistema }, ...historial]
+  const history = await sessionService.getHistory(conversationId)
+  const isFirstExchange = history.length === 1
+  let messages = [{ role: 'system', content: systemPrompt }, ...history]
 
-  let respuestaFinal = null
-  let iteracion = 0
-  let tokensAcumulados = 0
+  let finalResponse = null
+  let iteration = 0
+  let accumulatedTokens = 0
 
-  while (iteracion < MAX_ITERACIONES_TOOLS) {
-    const { mensajeAsistente, toolCalls, tokensUsados } = await completarConStream(mensajes, DEFINICIONES_HERRAMIENTAS, onEvento, tokensAcumulados)
-    iteracion++
+  while (iteration < MAX_TOOL_ITERATIONS) {
+    const { assistantMessage, toolCalls, tokensUsed } = await completeWithStream(messages, TOOL_DEFINITIONS, onEvent, accumulatedTokens)
+    iteration++
 
     if (!toolCalls.length) {
-      respuestaFinal = mensajeAsistente.content
-      if (tokensUsados) {
+      finalResponse = assistantMessage.content
+      if (tokensUsed) {
         try {
-          await repositorioEjecucion.crear({
-            idConversacion,
-            nombreHerramienta: '_turno',
-            entrada: {},
-            salida: null,
-            latenciaMs: 0,
-            tokensUsados,
-            errorMsg: null
+          await toolExecutionRepository.create({
+            conversationId,
+            toolName: '_turn',
+            input: {},
+            output: null,
+            latencyMs: 0,
+            tokensUsed,
+            errorMessage: null
           })
         } catch (err) {
-          console.error('Error al persistir tokens del turno:', err.message)
+          console.error('Could not save turn token usage:', err.message)
         }
       }
       break
     }
 
-    toolCalls.forEach(llamada => {
-      onEvento?.(eventoToolStart(llamada.function.name))
+    toolCalls.forEach(call => {
+      onEvent?.(toolStartEvent(call.function.name))
     })
 
-    const resultadosHerramientas = await Promise.all(
-      toolCalls.map(llamada => ejecutarHerramienta(llamada, idConversacion))
+    const toolResults = await Promise.all(
+      toolCalls.map(call => executeTool(call, conversationId))
     )
 
-    if (tokensUsados) {
-      tokensAcumulados += tokensUsados
+    if (tokensUsed) {
+      accumulatedTokens += tokensUsed
       try {
-        await repositorioEjecucion.crear({
-          idConversacion,
-          nombreHerramienta: '_turno',
-          entrada: null,
-          salida: null,
-          latenciaMs: 0,
-          tokensUsados,
-          errorMsg: null
+        await toolExecutionRepository.create({
+          conversationId,
+          toolName: '_turn',
+          input: null,
+          output: null,
+          latencyMs: 0,
+          tokensUsed,
+          errorMessage: null
         })
       } catch (err) {
-        console.error('Error al persistir tokens del turno:', err.message)
+        console.error('Could not save turn token usage:', err.message)
       }
     }
 
-    mensajes = [...mensajes, mensajeAsistente, ...resultadosHerramientas]
+    messages = [...messages, assistantMessage, ...toolResults]
   }
 
-  respuestaFinal = respuestaFinal ?? 'No pude generar una respuesta.'
-  const mensajeAsistenteGuardado = await servicioSesion.agregarMensaje({ idConversacion, rol: 'assistant', contenido: respuestaFinal })
+  finalResponse = finalResponse ?? 'I could not generate a response.'
+  const savedAssistantMessage = await sessionService.addMessage({ conversationId, role: 'assistant', content: finalResponse })
 
-  let titulo = null
-  if (esFirstExchange) {
-    titulo = await generarTitulo(mensajeUsuario)
-    if (titulo) {
+  let title = null
+  if (isFirstExchange) {
+    title = await generateTitle(userMessage)
+    if (title) {
       try {
-        await repositorioConversacion.actualizarTitulo(idConversacion, titulo)
+        await conversationRepository.updateTitle(conversationId, title)
       } catch (err) {
-        console.error('Error al guardar titulo:', err.message)
-        titulo = null
+        console.error('Could not save title:', err.message)
+        title = null
       }
     }
   }
 
   return {
-    conversationId: idConversacion,
-    respuesta: respuestaFinal,
-    assistantMessageId: mensajeAsistenteGuardado.id,
-    userMessageId: mensajeUsuarioGuardado.id,
-    titulo,
+    conversationId: conversationId,
+    response: finalResponse,
+    assistantMessageId: savedAssistantMessage.id,
+    userMessageId: savedUserMessage.id,
+    title,
   }
 }
 

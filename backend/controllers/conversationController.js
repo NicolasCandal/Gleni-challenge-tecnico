@@ -1,49 +1,49 @@
-const repositorioConversacion = require('../repositories/conversationRepository')
-const { crearConversacionDTO, crearRespuestaConversacionesDTO } = require('../dtos/ConversationDTO')
+const conversationRepository = require('../repositories/conversationRepository')
+const { createConversationDTO, createConversationsResponseDTO } = require('../dtos/ConversationDTO')
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const { isUuid } = require('../schemas/idSchema')
 
-async function listarConversaciones(req, res, next) {
+async function listConversations(req, res, next) {
   try {
     const rawIds = req.query.ids
-    if (!rawIds) return res.json(crearRespuestaConversacionesDTO([]))
+    if (!rawIds) return res.json(createConversationsResponseDTO([]))
 
-    const ids = rawIds.split(',').map(id => id.trim()).filter(id => UUID_RE.test(id))
-    if (ids.length === 0) return res.json(crearRespuestaConversacionesDTO([]))
+    const ids = rawIds.split(',').map(id => id.trim()).filter(isUuid)
+    if (ids.length === 0) return res.json(createConversationsResponseDTO([]))
 
-    const filas = await repositorioConversacion.listar(ids)
-    const conversaciones = filas.map(crearConversacionDTO)
-    res.json(crearRespuestaConversacionesDTO(conversaciones))
+    const rows = await conversationRepository.list(ids)
+    const conversations = rows.map(createConversationDTO)
+    res.json(createConversationsResponseDTO(conversations))
   } catch (err) {
     next(err)
   }
 }
 
-async function actualizarTituloConversacion(req, res, next) {
+async function updateConversationTitle(req, res, next) {
   try {
     const { id } = req.params
-    const { titulo } = req.body
+    const { title } = req.body
 
-    if (typeof titulo !== 'string' || titulo.trim().length === 0) {
-      return res.status(400).json({ error: 'El campo titulo es requerido y no puede estar vacio' })
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({ error: 'The title field is required and cannot be empty' })
     }
 
-    const tituloNormalizado = titulo.trim().slice(0, 100)
-    await repositorioConversacion.actualizarTitulo(id, tituloNormalizado)
-    res.json({ id, titulo: tituloNormalizado })
+    const normalizedTitle = title.trim().slice(0, 100)
+    await conversationRepository.updateTitle(id, normalizedTitle)
+    res.json({ id, title: normalizedTitle })
   } catch (err) {
     next(err)
   }
 }
 
-async function eliminarConversacion(req, res, next) {
+async function deleteConversation(req, res, next) {
   try {
     const { id } = req.params
-    await repositorioConversacion.eliminar(id)
+    await conversationRepository.remove(id)
     res.status(204).end()
   } catch (err) {
     next(err)
   }
 }
 
-module.exports = { listarConversaciones, actualizarTituloConversacion, eliminarConversacion }
+module.exports = { listConversations, updateConversationTitle, deleteConversation }

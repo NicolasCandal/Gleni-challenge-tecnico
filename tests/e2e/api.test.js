@@ -1,200 +1,161 @@
-// Cargar env vars antes que cualquier módulo los lea
-const path = require('path')
-require('dotenv').config({ path: path.join(__dirname, '../../backend/.env') })
-
 jest.mock('../../backend/infrastructure/openaiClient', () => ({
   chat: { completions: { create: jest.fn() } }
 }))
-jest.mock('../../backend/infrastructure/dolarapiClient')
-
-jest.setTimeout(20000)
+jest.mock('../../backend/repositories/conversationRepository', () => ({
+  create: jest.fn(), list: jest.fn(), updateTitle: jest.fn(), remove: jest.fn(),
+}))
+jest.mock('../../backend/repositories/messageRepository', () => ({
+  create: jest.fn(), listByConversation: jest.fn(),
+}))
+jest.mock('../../backend/repositories/toolExecutionRepository', () => ({
+  create: jest.fn(), listByConversation: jest.fn(),
+}))
 
 const request = require('supertest')
 const app = require('../../backend/app')
-const clienteOpenAI = require('../../backend/infrastructure/openaiClient')
-const { fetchExchangeRates } = require('../../backend/infrastructure/dolarapiClient')
-const supabase = require('../../backend/infrastructure/supabaseClient')
+const openaiClient = require('../../backend/infrastructure/openaiClient')
+const conversationRepository = require('../../backend/repositories/conversationRepository')
+const messageRepository = require('../../backend/repositories/messageRepository')
+const toolExecutionRepository = require('../../backend/repositories/toolExecutionRepository')
 
-// UUID válido pero inexistente en la DB
-const UUID_INEXISTENTE = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-let conversationIdPrueba = null
-let supabaseDisponible = false
+const CONVERSATION_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
+const MISSING_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+const CREATED_AT = '2026-01-01T00:00:00.000Z'
 
-function parsearEventosSSE(texto) {
-  return texto.split('\n')
-    .filter(linea => linea.startsWith('data: '))
-    .map(linea => JSON.parse(linea.slice(6)))
+function parseSSEEvents(text) {
+  return text.split('\n').filter(line => line.startsWith('data: '))
+    .map(line => JSON.parse(line.slice(6)))
 }
-
-function mockStreamOpenAI(texto = 'Respuesta de prueba.') {
-  clienteOpenAI.chat.completions.create.mockImplementation(async () =>
-    (async function* () {
-      yield { choices: [{ delta: { content: texto } }] }
-      yield { choices: [{ delta: {} }], usage: { total_tokens: 50 } }
-    })()
-  )
-}
-
-beforeAll(async () => {
-  // Calentamos Supabase y creamos datos de prueba para los tests de sesiones
-  try {
-    const { data: conv, error } = await supabase
-      .from('conversations')
-      .insert({})
-      .select()
-      .single()
-
-    if (error) {
-      console.warn('beforeAll: Supabase no disponible:', error.message)
-      return
-    }
-
-    conversationIdPrueba = conv.id
-    supabaseDisponible = true
-
-    await supabase.from('messages').insert([
-      { conversation_id: conv.id, role: 'user',      content: 'Consulta de prueba' },
-      { conversation_id: conv.id, role: 'assistant', content: 'Respuesta de prueba' }
-    ])
-  } catch (e) {
-    console.warn('beforeAll: error inesperado:', e.message)
-  }
-})
-
-afterAll(async () => {
-  if (conversationIdPrueba) {
-    try {
-      await supabase.from('messages').delete().eq('conversation_id', conversationIdPrueba)
-      await supabase.from('tool_executions').delete().eq('conversation_id', conversationIdPrueba)
-      await supabase.from('conversations').delete().eq('id', conversationIdPrueba)
-    } catch { /* best-effort */ }
-  }
-  await supabase.removeAllChannels()
-})
 
 beforeEach(() => {
-  fetchExchangeRates.mockResolvedValue({
-    datos: [
-      { casa: 'oficial', nombre: 'Oficial', compra: 1000, venta: 1010, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
-      { casa: 'blue',    nombre: 'Blue',    compra: 1150, venta: 1200, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
-    ],
-    fuente: 'dolarapi.com',
-    esFallback: false
-  })
+  jest.resetAllMocks()
+  conversationRepository.create.mockResolvedValue({ id: CONVERSATION_ID })
+  conversationRepository.list.mockResolvedValue([{ id: CONVERSATION_ID, title: 'Dollar rates', created_at: CREATED_AT }])
+  messageRepository.create.mockImplementation(async ({ role }) => ({ id: `message-${role}` }))
+  messageRepository.listByConversation.mockImplementation(async id => id === CONVERSATION_ID ? [
+    { id: 'user-id', role: 'user', content: 'Compare dollar rates.', created_at: CREATED_AT },
+    { id: 'assistant-id', role: 'assistant', content: 'Here are the rates.', created_at: CREATED_AT, feedback: 'up' },
+  ] : [])
+  toolExecutionRepository.create.mockResolvedValue({})
+  toolExecutionRepository.listByConversation.mockImplementation(async id => id === CONVERSATION_ID ? [{
+    id: 'execution-id', conversation_id: CONVERSATION_ID, tool_name: 'get_exchange_rates',
+    input: {}, output: {}, latency_ms: 42, tokens_used: null, error: null, created_at: CREATED_AT,
+  }] : [])
+  openaiClient.chat.completions.create.mockImplementation(async () => (async function* () {
+    yield { choices: [{ delta: { content: 'Here are the current exchange rates.' } }] }
+    yield { choices: [], usage: { total_tokens: 50 } }
+  })())
 })
 
-// ─── Health ───────────────────────────────────────────────────────────────────
-
 describe('GET /api/health', () => {
-  test('devuelve 200 con status ok', async () => {
+  test('returns a healthy status', async () => {
     const res = await request(app).get('/api/health')
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ status: 'ok' })
   })
 })
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
-
 describe('POST /api/chat', () => {
-  test('devuelve 400 si el body no tiene el campo mensaje', async () => {
-    const res = await request(app).post('/api/chat').send({})
+  test.each([{}, { message: '' }])('rejects a missing or empty message: %j', async body => {
+    const res = await request(app).post('/api/chat').send(body)
     expect(res.status).toBe(400)
     expect(res.body).toHaveProperty('error')
+    expect(messageRepository.create).not.toHaveBeenCalled()
   })
 
-  test('devuelve 400 si mensaje es una cadena vacía', async () => {
-    const res = await request(app).post('/api/chat').send({ mensaje: '' })
-    expect(res.status).toBe(400)
-  })
-
-  test('responde con stream SSE que contiene chunks y evento fin', async () => {
-    if (!supabaseDisponible) {
-      console.warn('Supabase no disponible, omitiendo test')
-      return
-    }
-
-    mockStreamOpenAI('Hola, esta es mi respuesta.')
-
-    const res = await request(app)
-      .post('/api/chat')
-      .send({ mensaje: '¿Cuál es el dólar blue hoy?' })
-
+  test('streams English application events and persists the answer', async () => {
+    const res = await request(app).post('/api/chat')
+      .send({ conversationId: CONVERSATION_ID, message: 'Compare dollar rates.' })
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toMatch('text/event-stream')
-
-    const eventos = parsearEventosSSE(res.text)
-    const chunks = eventos.filter(e => e.tipo === 'chunk')
-    const fin = eventos.find(e => e.tipo === 'fin')
-
-    expect(chunks.length).toBeGreaterThan(0)
-    expect(fin).toBeDefined()
-    expect(fin.conversationId).toBeDefined()
+    const events = parseSSEEvents(res.text)
+    expect(events).toContainEqual({ type: 'chunk', text: 'Here are the current exchange rates.' })
+    expect(events).toContainEqual({ type: 'usage', tokens: 50 })
+    expect(events).toContainEqual({ type: 'done', conversationId: CONVERSATION_ID, assistantMessageId: 'message-assistant', title: null })
+    expect(messageRepository.create).toHaveBeenCalledWith({
+      conversationId: CONVERSATION_ID, role: 'assistant', content: 'Here are the current exchange rates.',
+    })
   })
 
-  test('emite evento de error en el stream si OpenAI falla', async () => {
-    clienteOpenAI.chat.completions.create.mockRejectedValue(new Error('OpenAI no disponible'))
+  test('creates a conversation and generates an English title for the first exchange', async () => {
+    messageRepository.listByConversation.mockResolvedValue([{ role: 'user', content: 'Compare dollar rates.' }])
+    openaiClient.chat.completions.create.mockResolvedValueOnce((async function* () {
+      yield { choices: [{ delta: { content: 'Here are the rates.' } }] }
+    })()).mockResolvedValueOnce({ choices: [{ message: { content: 'Dollar Rate Comparison' } }] })
+    const res = await request(app).post('/api/chat').send({ message: 'Compare dollar rates.' })
+    expect(conversationRepository.create).toHaveBeenCalledTimes(1)
+    expect(conversationRepository.updateTitle).toHaveBeenCalledWith(CONVERSATION_ID, 'Dollar Rate Comparison')
+    expect(openaiClient.chat.completions.create.mock.calls[1][0].messages[0].content).toContain('English title')
+    expect(parseSSEEvents(res.text)).toContainEqual(expect.objectContaining({ type: 'done', title: 'Dollar Rate Comparison' }))
+  })
 
-    const res = await request(app)
-      .post('/api/chat')
-      .send({ mensaje: '¿Cotización del dólar?' })
-
+  test('streams an error if OpenAI fails', async () => {
+    openaiClient.chat.completions.create.mockRejectedValue(new Error('OpenAI unavailable'))
+    const res = await request(app).post('/api/chat')
+      .send({ conversationId: CONVERSATION_ID, message: 'What is the dollar rate?' })
     expect(res.status).toBe(200)
-    const eventos = parsearEventosSSE(res.text)
-    const eventoError = eventos.find(e => e.tipo === 'error')
-    expect(eventoError).toBeDefined()
-    expect(eventoError.mensaje).toBeTruthy()
+    expect(parseSSEEvents(res.text)).toContainEqual({ type: 'error', message: 'OpenAI unavailable', status: 500 })
+    expect(messageRepository.create).not.toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant' }))
   })
 })
-
-// ─── Sesiones: ejecuciones ────────────────────────────────────────────────────
 
 describe('GET /api/sessions/:id/executions', () => {
-  test('devuelve 200 con array para una conversación existente', async () => {
-    if (!conversationIdPrueba) {
-      console.warn('Supabase no disponible, omitiendo test')
-      return
-    }
-    const res = await request(app)
-      .get(`/api/sessions/${conversationIdPrueba}/executions`)
+  test('returns public execution fields without leaking the conversation column', async () => {
+    const res = await request(app).get(`/api/sessions/${CONVERSATION_ID}/executions`)
     expect(res.status).toBe(200)
-    expect(Array.isArray(res.body.ejecuciones)).toBe(true)
+    expect(res.body).toEqual({ executions: [{
+      id: 'execution-id', tool: 'get_exchange_rates', input: {}, output: {}, latencyMs: 42,
+      tokensUsed: null, error: null, createdAt: CREATED_AT,
+    }] })
   })
-
-  test('devuelve 200 con array vacío para un id inexistente', async () => {
-    if (!conversationIdPrueba) {
-      console.warn('Supabase no disponible, omitiendo test')
-      return
-    }
-    const res = await request(app)
-      .get(`/api/sessions/${UUID_INEXISTENTE}/executions`)
+  test('returns an empty array for an unknown conversation', async () => {
+    const res = await request(app).get(`/api/sessions/${MISSING_ID}/executions`)
     expect(res.status).toBe(200)
-    expect(res.body.ejecuciones).toEqual([])
+    expect(res.body).toEqual({ executions: [] })
   })
 })
 
-// ─── Sesiones: mensajes ───────────────────────────────────────────────────────
-
 describe('GET /api/sessions/:id/messages', () => {
-  test('devuelve 200 con mensajes de la conversación existente', async () => {
-    if (!conversationIdPrueba) {
-      console.warn('Supabase no disponible, omitiendo test')
-      return
-    }
-    const res = await request(app)
-      .get(`/api/sessions/${conversationIdPrueba}/messages`)
+  test('returns English message fields and hydrated feedback', async () => {
+    const res = await request(app).get(`/api/sessions/${CONVERSATION_ID}/messages`)
     expect(res.status).toBe(200)
-    expect(Array.isArray(res.body.mensajes)).toBe(true)
-    expect(res.body.mensajes.length).toBeGreaterThan(0)
+    expect(res.body.messages).toHaveLength(2)
+    expect(res.body.messages[1]).toEqual({
+      id: 'assistant-id', role: 'assistant', content: 'Here are the rates.', createdAt: CREATED_AT, feedback: 'up',
+    })
   })
-
-  test('devuelve 200 con array vacío para un id inexistente', async () => {
-    if (!conversationIdPrueba) {
-      console.warn('Supabase no disponible, omitiendo test')
-      return
-    }
-    const res = await request(app)
-      .get(`/api/sessions/${UUID_INEXISTENTE}/messages`)
+  test('returns an empty array for an unknown conversation', async () => {
+    const res = await request(app).get(`/api/sessions/${MISSING_ID}/messages`)
     expect(res.status).toBe(200)
-    expect(res.body.mensajes).toEqual([])
+    expect(res.body).toEqual({ messages: [] })
+  })
+})
+
+describe('conversation management', () => {
+  test('returns English conversation metadata', async () => {
+    const res = await request(app).get(`/api/conversations?ids=${CONVERSATION_ID}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ conversations: [{ id: CONVERSATION_ID, title: 'Dollar rates', createdAt: CREATED_AT }] })
+  })
+  test('renames a conversation using a trimmed title', async () => {
+    const res = await request(app).patch(`/api/conversations/${CONVERSATION_ID}`).send({ title: '  Euro conversion  ' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ id: CONVERSATION_ID, title: 'Euro conversion' })
+    expect(conversationRepository.updateTitle).toHaveBeenCalledWith(CONVERSATION_ID, 'Euro conversion')
+  })
+  test('rejects an empty title', async () => {
+    const res = await request(app).patch(`/api/conversations/${CONVERSATION_ID}`).send({ title: ' ' })
+    expect(res.status).toBe(400)
+    expect(conversationRepository.updateTitle).not.toHaveBeenCalled()
+  })
+  test('deletes the requested conversation', async () => {
+    const res = await request(app).delete(`/api/conversations/${CONVERSATION_ID}`)
+    expect(res.status).toBe(204)
+    expect(conversationRepository.remove).toHaveBeenCalledWith(CONVERSATION_ID)
+  })
+  test.each([['patch', '/api/conversations/invalid'], ['get', '/api/sessions/invalid/messages']])('rejects malformed UUIDs: %s %s', async (method, path) => {
+    const res = await request(app)[method](path)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/valid UUID/)
   })
 })

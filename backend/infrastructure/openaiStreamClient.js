@@ -1,18 +1,18 @@
-const clienteOpenAI = require('./openaiClient')
-const { eventoChunk, eventoUsage } = require('../dtos/ChatDTO')
+const openaiClient = require('./openaiClient')
+const { chunkEvent, usageEvent } = require('../dtos/ChatDTO')
 
-const MAX_REINTENTOS = 2
-const DEMORA_BASE_MS = 1000
+const MAX_RETRIES = 2
+const BASE_DELAY_MS = 1000
 const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 30_000
 
-async function completarConStream(mensajes, definicionesHerramientas, onEvento, tokensBase = 0, intento = 0) {
-  let flujo
+async function completeWithStream(messages, toolDefinitions, onEvent, tokensBase = 0, attempt = 0) {
+  let stream
   try {
-    flujo = await clienteOpenAI.chat.completions.create(
+    stream = await openaiClient.chat.completions.create(
       {
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: mensajes,
-        tools: definicionesHerramientas,
+        messages: messages,
+        tools: toolDefinitions,
         tool_choice: 'auto',
         stream: true,
         stream_options: { include_usage: true }
@@ -20,23 +20,23 @@ async function completarConStream(mensajes, definicionesHerramientas, onEvento, 
       { timeout: OPENAI_TIMEOUT_MS }
     )
   } catch (err) {
-    if (err.status === 429 && intento < MAX_REINTENTOS) {
-      const demora = DEMORA_BASE_MS * Math.pow(2, intento)
-      await new Promise(res => setTimeout(res, demora))
-      return completarConStream(mensajes, definicionesHerramientas, onEvento, tokensBase, intento + 1)
+    if (err.status === 429 && attempt < MAX_RETRIES) {
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt)
+      await new Promise(res => setTimeout(res, delay))
+      return completeWithStream(messages, toolDefinitions, onEvent, tokensBase, attempt + 1)
     }
     throw err
   }
 
-  let contenidoTexto = ''
-  const mapaToolCalls = {}
-  let tokensUsados = null
-  let tokensEstimados = tokensBase
+  let textContent = ''
+  const toolCallMap = {}
+  let tokensUsed = null
+  let estimatedTokens = tokensBase
 
-  for await (const chunk of flujo) {
+  for await (const chunk of stream) {
     if (chunk.usage) {
-      tokensUsados = chunk.usage.total_tokens
-      onEvento?.(eventoUsage(tokensBase + tokensUsados))
+      tokensUsed = chunk.usage.total_tokens
+      onEvent?.(usageEvent(tokensBase + tokensUsed))
       continue
     }
 
@@ -44,43 +44,43 @@ async function completarConStream(mensajes, definicionesHerramientas, onEvento, 
     if (!delta) continue
 
     if (delta.content) {
-      contenidoTexto += delta.content
-      onEvento?.(eventoChunk(delta.content))
+      textContent += delta.content
+      onEvent?.(chunkEvent(delta.content))
       try {
         const chars = delta.content.length || 0
-        const incremento = Math.max(1, Math.ceil(chars / 4))
-        tokensEstimados += incremento
-        onEvento?.(eventoUsage(tokensEstimados))
+        const increment = Math.max(1, Math.ceil(chars / 4))
+        estimatedTokens += increment
+        onEvent?.(usageEvent(estimatedTokens))
       } catch (e) {
-        // no bloquear por errores de estimación
+        // Token estimates must not interrupt streaming.
       }
     }
 
     if (delta.tool_calls) {
       for (const tc of delta.tool_calls) {
-        if (!mapaToolCalls[tc.index]) {
-          mapaToolCalls[tc.index] = {
+        if (!toolCallMap[tc.index]) {
+          toolCallMap[tc.index] = {
             id: tc.id,
             type: 'function',
             function: { name: tc.function?.name ?? '', arguments: '' }
           }
         }
         if (tc.function?.arguments) {
-          mapaToolCalls[tc.index].function.arguments += tc.function.arguments
+          toolCallMap[tc.index].function.arguments += tc.function.arguments
         }
       }
     }
   }
 
-  const toolCalls = Object.values(mapaToolCalls)
+  const toolCalls = Object.values(toolCallMap)
 
-  const mensajeAsistente = {
+  const assistantMessage = {
     role: 'assistant',
-    content: contenidoTexto || null,
+    content: textContent || null,
     ...(toolCalls.length ? { tool_calls: toolCalls } : {})
   }
 
-  return { mensajeAsistente, toolCalls, tokensUsados }
+  return { assistantMessage, toolCalls, tokensUsed }
 }
 
-module.exports = { completarConStream }
+module.exports = { completeWithStream }

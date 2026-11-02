@@ -1,341 +1,293 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { fetchStream, fetchMensajes, fetchConversaciones, deleteConversacion, updateConversacionTitulo, HttpError, enviarFeedbackMensaje } from '../services/api'
+import { fetchStream, fetchMessages, fetchConversations, deleteConversation as deleteConversationRequest, updateConversationTitle, HttpError, sendMessageFeedback } from '../services/api'
+import { loadConversations, saveConversationsToStorage, loadRateLimit, RATE_LIMIT_KEY } from '../services/conversationStorage'
 
-export type Rol = 'user' | 'assistant' | 'tool_call'
-export type FeedbackValor = 'up' | 'down'
+export type Role = 'user' | 'assistant' | 'tool_call'
+export type FeedbackValue = 'up' | 'down'
 
-export interface Mensaje {
+export interface Message {
   id?: string
-  rol: Rol
-  contenido: string
-  parcial?: boolean
-  feedback?: FeedbackValor | null
+  role: Role
+  content: string
+  partial?: boolean
+  feedback?: FeedbackValue | null
 }
 
-export interface ConversacionLocal {
+export interface LocalConversation {
   id: string
-  titulo: string | null
-  creadoEn: string
+  title: string | null
+  createdAt: string
 }
 
-export interface EstadoChat {
-  mensajes: Mensaje[]
-  cargando: boolean
-  cargandoConversation: boolean
+export interface ChatState {
+  messages: Message[]
+  loading: boolean
+  loadingConversation: boolean
   tokensLive: number | null
   error: string | null
   errorStatus: number | null
   rateLimited: boolean
   conversationId: string | null
-  conversaciones: ConversacionLocal[]
+  conversations: LocalConversation[]
   refreshKey: number
-  enviar: (texto: string) => Promise<void>
-  enviarFeedback: (messageId: string, feedback: FeedbackValor) => Promise<void>
-  resetear: () => void
-  seleccionarConversacion: (id: string) => Promise<void>
-  eliminarConversacion: (id: string) => Promise<void>
-  renombrarConversacion: (id: string, titulo: string) => Promise<void>
+  send: (text: string) => Promise<void>
+  sendFeedback: (messageId: string, feedback: FeedbackValue) => Promise<void>
+  reset: () => void
+  selectConversation: (id: string) => Promise<void>
+  deleteConversation: (id: string) => Promise<void>
+  renameConversation: (id: string, title: string) => Promise<void>
 }
 
-const CLAVE_CONVERSACIONES = 'asesor_conversaciones'
-const CLAVE_RATE_LIMIT = 'asesor_rate_limited_at'
+export function useChat(): ChatState {
+  const [initialConversations] = useState(loadConversations)
 
-function cargarConversaciones(): ConversacionLocal[] {
-  try {
-    const raw = localStorage.getItem(CLAVE_CONVERSACIONES)
-    if (raw) return JSON.parse(raw) as ConversacionLocal[]
-    // Migracion desde clave antigua
-    const oldId = localStorage.getItem('asesor_conversation_id')
-    if (oldId) {
-      const migradas: ConversacionLocal[] = [{ id: oldId, titulo: null, creadoEn: new Date().toISOString() }]
-      localStorage.setItem(CLAVE_CONVERSACIONES, JSON.stringify(migradas))
-      localStorage.removeItem('asesor_conversation_id')
-      return migradas
-    }
-    return []
-  } catch {
-    return []
-  }
-}
-
-function guardarConversacionesEnStorage(conversaciones: ConversacionLocal[]) {
-  localStorage.setItem(CLAVE_CONVERSACIONES, JSON.stringify(conversaciones))
-}
-
-export function useChat(): EstadoChat {
-  const conversacionesIniciales = useRef(cargarConversaciones())
-
-  const [mensajes, setMensajes] = useState<Mensaje[]>([])
-  const [cargando, setCargando] = useState(false)
-  const [cargandoConversation, setCargandoConversation] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadingConversation, setLoadingConversation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [conversaciones, setConversaciones] = useState<ConversacionLocal[]>(conversacionesIniciales.current)
+  const [conversations, setConversations] = useState<LocalConversation[]>(initialConversations)
   const [conversationId, setConversationId] = useState<string | null>(
-    () => conversacionesIniciales.current.at(-1)?.id ?? null
+    () => initialConversations.at(-1)?.id ?? null
   )
   const [tokensLive, setTokensLive] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [rateLimitedAt, setRateLimitedAt] = useState<number | null>(() => {
-    const guardado = localStorage.getItem(CLAVE_RATE_LIMIT)
-    if (!guardado) return null
-    const ts = Number(guardado)
-    return Date.now() - ts < 60_000 ? ts : null
-  })
+  const [rateLimitedAt, setRateLimitedAt] = useState<number | null>(loadRateLimit)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!rateLimitedAt) {
-      localStorage.removeItem(CLAVE_RATE_LIMIT)
+      localStorage.removeItem(RATE_LIMIT_KEY)
       return
     }
-    localStorage.setItem(CLAVE_RATE_LIMIT, String(rateLimitedAt))
+    localStorage.setItem(RATE_LIMIT_KEY, String(rateLimitedAt))
     const ms = 60_000 - (Date.now() - rateLimitedAt)
     if (ms <= 0) { setRateLimitedAt(null); return }
     const t = setTimeout(() => setRateLimitedAt(null), ms)
     return () => clearTimeout(t)
   }, [rateLimitedAt])
 
-  // Al montar: sincronizar titulos y cargar historial de la conversacion activa
+  // Sync titles and load the active conversation on mount.
   useEffect(() => {
-    const convs = conversacionesIniciales.current
+    const convs = initialConversations
     if (convs.length === 0) return
 
-    // Sincronizar titulos desde el backend
-    fetchConversaciones(convs.map(c => c.id)).then(remotas => {
-      if (remotas.length === 0) return
-      const mapaRemoto = Object.fromEntries(remotas.map(r => [r.id, r]))
-      setConversaciones(prev => {
-        const actualizadas = prev.map(c => ({
+    // Sync titles from the backend.
+    fetchConversations(convs.map(c => c.id)).then(remote => {
+      if (remote.length === 0) return
+      const remoteMap = Object.fromEntries(remote.map(r => [r.id, r]))
+      setConversations(prev => {
+        const updated = prev.map(c => ({
           ...c,
-          titulo: mapaRemoto[c.id]?.titulo ?? c.titulo,
+          title: remoteMap[c.id]?.title ?? c.title,
         }))
-        guardarConversacionesEnStorage(actualizadas)
-        return actualizadas
+        saveConversationsToStorage(updated)
+        return updated
       })
-    }).catch(() => { /* silencioso */ })
+    }).catch(() => { /* Ignore background sync failures. */ })
 
-    // Cargar historial de la conversacion activa (la ultima)
-    const idActivo = convs.at(-1)?.id
-    if (!idActivo) return
+    // Load the most recent conversation.
+    const activeId = convs.at(-1)?.id
+    if (!activeId) return
 
-    setCargandoConversation(true)
-    fetchMensajes(idActivo).then(filas => {
-      if (filas.length === 0) return
-      setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
+    setLoadingConversation(true)
+    fetchMessages(activeId).then(rows => {
+      if (rows.length === 0) return
+      setMessages(rows.map(f => ({ id: f.id, role: f.role, content: f.content, feedback: f.feedback ?? null })))
       setRefreshKey(k => k + 1)
-    }).finally(() => setCargandoConversation(false))
+    }).finally(() => setLoadingConversation(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const agregarOActualizarConversacion = useCallback((id: string, titulo: string | null) => {
-    setConversaciones(prev => {
-      const existe = prev.find(c => c.id === id)
-      let actualizadas: ConversacionLocal[]
-      if (existe) {
-        actualizadas = prev.map(c => c.id === id ? { ...c, titulo: titulo ?? c.titulo } : c)
+  const addOrUpdateConversation = useCallback((id: string, title: string | null) => {
+    setConversations(prev => {
+      const existing = prev.find(c => c.id === id)
+      let updated: LocalConversation[]
+      if (existing) {
+        updated = prev.map(c => c.id === id ? { ...c, title: title ?? c.title } : c)
       } else {
-        actualizadas = [...prev, { id, titulo, creadoEn: new Date().toISOString() }]
+        updated = [...prev, { id, title, createdAt: new Date().toISOString() }]
       }
-      guardarConversacionesEnStorage(actualizadas)
-      return actualizadas
+      saveConversationsToStorage(updated)
+      return updated
     })
   }, [])
 
-  const seleccionarConversacion = useCallback(async (id: string) => {
+  const selectConversation = useCallback(async (id: string) => {
     if (id === conversationId) return
     abortRef.current?.abort()
     abortRef.current = null
     setConversationId(id)
-    setMensajes([])
+    setMessages([])
     setError(null)
     setErrorStatus(null)
     setRefreshKey(0)
     setTokensLive(null)
 
-    setCargandoConversation(true)
+    setLoadingConversation(true)
     try {
-      const filas = await fetchMensajes(id)
-      if (filas.length > 0) {
-        setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
+      const rows = await fetchMessages(id)
+      if (rows.length > 0) {
+        setMessages(rows.map(f => ({ id: f.id, role: f.role, content: f.content, feedback: f.feedback ?? null })))
         setRefreshKey(k => k + 1)
       }
     } catch {
-      // silencioso
+      // Ignore background sync failures.
     } finally {
-      setCargandoConversation(false)
+      setLoadingConversation(false)
     }
   }, [conversationId])
 
-  const enviar = useCallback(async (texto: string) => {
-    if (!texto.trim() || cargando) return
+  const send = useCallback(async (text: string) => {
+    if (!text.trim() || loading) return
 
     setError(null)
     setErrorStatus(null)
-    setCargando(true)
+    setLoading(true)
 
-    setMensajes(prev => [...prev, { rol: 'user', contenido: texto }])
-    setMensajes(prev => [...prev, { rol: 'assistant', contenido: '', parcial: true, feedback: null }])
+    setMessages(prev => [...prev, { role: 'user', content: text }])
+    setMessages(prev => [...prev, { role: 'assistant', content: '', partial: true, feedback: null }])
     setTokensLive(0)
 
     const controller = new AbortController()
     abortRef.current = controller
 
     try {
-      await fetchStream(conversationId, texto, (evento) => {
-        if (evento.tipo === 'chunk') {
-          setMensajes(prev => {
-            const copia = [...prev]
-            let idx = copia.length - 1
-            while (idx >= 0 && copia[idx].rol !== 'assistant') idx--
-            if (idx === -1) return copia
-            copia[idx] = { ...copia[idx], contenido: copia[idx].contenido + evento.texto }
-            return copia
+      await fetchStream(conversationId, text, (event) => {
+        if (event.type === 'chunk') {
+          setMessages(prev => {
+            const copy = [...prev]
+            let idx = copy.length - 1
+            while (idx >= 0 && copy[idx].role !== 'assistant') idx--
+            if (idx === -1) return copy
+            copy[idx] = { ...copy[idx], content: copy[idx].content + event.text }
+            return copy
           })
-        } else if (evento.tipo === 'usage') {
-          setTokensLive(evento.tokens)
-        } else if (evento.tipo === 'tool_start') {
-          setMensajes(prev => [...prev, { rol: 'tool_call', contenido: evento.herramienta, parcial: true }])
-        } else if (evento.tipo === 'fin') {
-          const nuevoId = evento.conversationId
-          setConversationId(nuevoId)
-          agregarOActualizarConversacion(nuevoId, evento.titulo ?? null)
+        } else if (event.type === 'usage') {
+          setTokensLive(event.tokens)
+        } else if (event.type === 'tool_start') {
+          setMessages(prev => [...prev, { role: 'tool_call', content: event.tool, partial: true }])
+        } else if (event.type === 'done') {
+          const newId = event.conversationId
+          setConversationId(newId)
+          addOrUpdateConversation(newId, event.title ?? null)
           setRefreshKey(k => k + 1)
-          setMensajes(prev => {
-            const sinToolCalls = prev.filter(m => m.rol !== 'tool_call')
-            const copia = [...sinToolCalls]
-            copia[copia.length - 1] = { ...copia[copia.length - 1], parcial: false, id: evento.assistantMessageId ?? copia[copia.length - 1].id }
-            return copia
+          setMessages(prev => {
+            const withoutToolCalls = prev.filter(m => m.role !== 'tool_call')
+            const copy = [...withoutToolCalls]
+            copy[copy.length - 1] = { ...copy[copy.length - 1], partial: false, id: event.assistantMessageId ?? copy[copy.length - 1].id }
+            return copy
           })
-        } else if (evento.tipo === 'error') {
-          setError(evento.mensaje)
-          setErrorStatus(evento.status ?? null)
-          if (evento.status === 429) setRateLimitedAt(Date.now())
-          setMensajes(prev => prev.filter(m => m.rol !== 'tool_call').slice(0, -1))
+        } else if (event.type === 'error') {
+          setError(event.message)
+          setErrorStatus(event.status ?? null)
+          if (event.status === 429) setRateLimitedAt(Date.now())
+          setMessages(prev => prev.filter(m => m.role !== 'tool_call').slice(0, -1))
         }
       }, controller.signal)
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
-      const mensaje = err instanceof Error ? err.message : 'Error de conexion'
+      const message = err instanceof Error ? err.message : 'Connection error'
       const status = err instanceof HttpError ? err.status : null
-      setError(mensaje)
+      setError(message)
       setErrorStatus(status)
       if (status === 429) setRateLimitedAt(Date.now())
-      setMensajes(prev => prev.filter(m => m.rol !== 'tool_call').slice(0, -1))
+      setMessages(prev => prev.filter(m => m.role !== 'tool_call').slice(0, -1))
       setTokensLive(null)
     } finally {
       abortRef.current = null
-      setCargando(false)
+      setLoading(false)
     }
-  }, [conversationId, cargando, agregarOActualizarConversacion])
+  }, [conversationId, loading, addOrUpdateConversation])
 
-  const resetear = useCallback(() => {
+  const reset = useCallback(() => {
     abortRef.current?.abort()
     abortRef.current = null
     setConversationId(null)
-    setMensajes([])
+    setMessages([])
     setError(null)
     setErrorStatus(null)
     setRefreshKey(0)
     setTokensLive(null)
   }, [])
 
-  const eliminarConversacion = useCallback(async (id: string) => {
+  const deleteConversation = useCallback(async (id: string) => {
     // Optimistic: remove from local state first
-    setConversaciones(prev => {
-      const actualizadas = prev.filter(c => c.id !== id)
-      guardarConversacionesEnStorage(actualizadas)
-      return actualizadas
-    })
+    const remaining = conversations.filter(c => c.id !== id)
+    setConversations(remaining)
+    saveConversationsToStorage(remaining)
 
     // If it was active, switch to the most recent remaining or reset
     if (id === conversationId) {
-      setConversaciones(prev => {
-        const restantes = prev // already filtered above
-        const siguiente = restantes.at(-1)
-        if (siguiente) {
-          setConversationId(siguiente.id)
-          setMensajes([])
-          setRefreshKey(0)
-          setCargandoConversation(true)
-          fetchMensajes(siguiente.id).then(filas => {
-            if (filas.length > 0) {
-              setMensajes(filas.map(f => ({ id: f.id, rol: f.role, contenido: f.content, feedback: f.feedback ?? null })))
-              setRefreshKey(k => k + 1)
-            }
-          }).finally(() => setCargandoConversation(false))
-        } else {
-          setConversationId(null)
-          setMensajes([])
-          setRefreshKey(0)
-        }
-        return prev
-      })
+      reset()
+      const next = remaining.at(-1)
+      if (next) void selectConversation(next.id)
     }
 
     // Fire and forget: delete from backend
-    deleteConversacion(id).catch(err => {
-      console.error('Error al eliminar conversacion en backend:', err.message)
+    deleteConversationRequest(id).catch(err => {
+      console.error('Could not delete conversation on the server:', err.message)
     })
-  }, [conversationId])
+  }, [conversationId, conversations, reset, selectConversation])
 
 
-  const renombrarConversacion = useCallback(async (id: string, titulo: string) => {
-    const tituloNormalizado = titulo.trim().slice(0, 100)
-    if (!tituloNormalizado) return
+  const renameConversation = useCallback(async (id: string, title: string) => {
+    const normalizedTitle = title.trim().slice(0, 100)
+    if (!normalizedTitle) return
+    const previousTitle = conversations.find(c => c.id === id)?.title ?? null
 
     // Optimistic update
-    setConversaciones(prev => {
-      const actualizadas = prev.map(c => c.id === id ? { ...c, titulo: tituloNormalizado } : c)
-      guardarConversacionesEnStorage(actualizadas)
-      return actualizadas
+    setConversations(prev => {
+      const updated = prev.map(c => c.id === id ? { ...c, title: normalizedTitle } : c)
+      saveConversationsToStorage(updated)
+      return updated
     })
 
     try {
-      await updateConversacionTitulo(id, tituloNormalizado)
+      await updateConversationTitle(id, normalizedTitle)
     } catch (err) {
-      console.error('Error al renombrar conversacion:', err instanceof Error ? err.message : err)
+      console.error('Could not rename conversation:', err instanceof Error ? err.message : err)
       // revert on error
-      setConversaciones(prev => {
-        const revertidas = prev.map(c =>
-          c.id === id ? { ...c, titulo: prev.find(x => x.id === id)?.titulo ?? c.titulo } : c
+      setConversations(prev => {
+        const reverted = prev.map(c =>
+          c.id === id && c.title === normalizedTitle ? { ...c, title: previousTitle } : c
         )
-        guardarConversacionesEnStorage(revertidas)
-        return revertidas
+        saveConversationsToStorage(reverted)
+        return reverted
       })
     }
-  }, [])
+  }, [conversations])
 
-  const enviarFeedback = useCallback(async (messageId: string, feedback: FeedbackValor) => {
-    const mensajeAnterior = mensajes.find(m => m.id === messageId)
-    if (!mensajeAnterior) return
+  const sendFeedback = useCallback(async (messageId: string, feedback: FeedbackValue) => {
+    const previousMessage = messages.find(m => m.id === messageId)
+    if (!previousMessage) return
 
-    setMensajes(prev => prev.map(m => (m.id === messageId ? { ...m, feedback } : m)))
+    setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, feedback } : m)))
 
     try {
-      await enviarFeedbackMensaje(messageId, feedback)
+      await sendMessageFeedback(messageId, feedback)
     } catch (err) {
-      setMensajes(prev => prev.map(m => (m.id === messageId ? { ...m, feedback: mensajeAnterior.feedback ?? null } : m)))
+      setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, feedback: previousMessage.feedback ?? null } : m)))
       throw err
     }
-  }, [mensajes])
+  }, [messages])
 
   return {
-    mensajes,
-    cargando,
-    cargandoConversation,
+    messages,
+    loading,
+    loadingConversation,
     tokensLive,
     error,
     errorStatus,
     rateLimited: rateLimitedAt !== null,
     conversationId,
-    conversaciones,
+    conversations,
     refreshKey,
-    enviar,
-    enviarFeedback,
-    resetear,
-    seleccionarConversacion,
-    eliminarConversacion,
-    renombrarConversacion,
+    send,
+    sendFeedback,
+    reset,
+    selectConversation,
+    deleteConversation,
+    renameConversation,
   }
 }

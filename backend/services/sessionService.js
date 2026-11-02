@@ -1,17 +1,17 @@
-const repositorioConversacion = require('../repositories/conversationRepository')
-const repositorioMensaje = require('../repositories/messageRepository')
+const conversationRepository = require('../repositories/conversationRepository')
+const messageRepository = require('../repositories/messageRepository')
 
-async function crearConversacion() {
-  return repositorioConversacion.crear()
+async function createConversation() {
+  return conversationRepository.create()
 }
 
-async function agregarMensaje({ idConversacion, rol, contenido }) {
-  return repositorioMensaje.crear({ idConversacion, rol, contenido })
+async function addMessage({ conversationId, role, content }) {
+  return messageRepository.create({ conversationId, role, content })
 }
 
-async function obtenerHistorial(idConversacion) {
-  const mensajes = await repositorioMensaje.listarPorConversacion(idConversacion)
-  return mensajes.map(m => ({ role: m.role, content: m.content }))
+async function getHistory(conversationId) {
+  const messages = await messageRepository.listByConversation(conversationId)
+  return messages.map(m => ({ role: m.role, content: m.content }))
 }
 
-module.exports = { crearConversacion, agregarMensaje, obtenerHistorial }
+module.exports = { createConversation, addMessage, getHistory }

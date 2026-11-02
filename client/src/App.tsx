@@ -31,7 +31,7 @@ function useDarkMode() {
 }
 
 export default function App() {
-  const { mensajes, cargando, cargandoConversation, tokensLive, error, errorStatus, rateLimited, conversationId, conversaciones, refreshKey, enviar, enviarFeedback, resetear, seleccionarConversacion, eliminarConversacion, renombrarConversacion } = useChat()
+  const { messages, loading, loadingConversation, tokensLive, error, errorStatus, rateLimited, conversationId, conversations, refreshKey, send, sendFeedback, reset, selectConversation, deleteConversation, renameConversation } = useChat()
   const { dark, toggle } = useDarkMode()
 
   const muiTheme = useMemo(
@@ -47,29 +47,29 @@ export default function App() {
       <Box
         sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}
         role="application"
-        aria-label="Aplicación Asesor de Cambio de Divisas"
+        aria-label="Currency Exchange Advisor app"
       >
-        {/* Sidebar de conversaciones */}
+        {/* Conversation sidebar */}
         <ConversationSidebar
-          conversaciones={conversaciones}
-          conversationIdActivo={conversationId}
-          onSeleccionar={seleccionarConversacion}
-          onNueva={resetear}
-          onEliminar={eliminarConversacion}
-          onRenombrar={renombrarConversacion}
+          conversations={conversations}
+          activeConversationId={conversationId}
+          onSelect={selectConversation}
+          onNew={reset}
+          onDelete={deleteConversation}
+          onRename={renameConversation}
           dark={dark}
         />
 
-        {/* Área principal */}
+        {/* Main content */}
         <Box component="main" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
           <AppBar position="static" color="default" elevation={1} component="header">
             <Toolbar variant="dense" sx={{ justifyContent: 'space-between' }}>
               <Box>
                 <Typography variant="subtitle1" component="h1" sx={{ lineHeight: 1.3, fontWeight: 600 }}>
-                  Asesor de Cambio de Divisas
+                  Currency Exchange Advisor
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Cotizaciones en tiempo real · dolarapi.com
+                  Exchange rates · dolarapi.com and exchange-api
                 </Typography>
               </Box>
               <Switch
@@ -78,14 +78,14 @@ export default function App() {
                 size="small"
                 slotProps={{
                   input: {
-                    'aria-label': `Alternar modo oscuro (actualmente en ${dark ? 'oscuro' : 'claro'})`,
+                    'aria-label': `Toggle dark mode (currently ${dark ? 'dark' : 'light'})`,
                   },
                 }}
               />
             </Toolbar>
           </AppBar>
 
-          <ChatWindow mensajes={mensajes} onFeedback={enviarFeedback} />
+          <ChatWindow messages={messages} onFeedback={sendFeedback} />
 
           {error && (
             <Alert severity={alertSeverity} sx={{ mx: 2, mb: 1 }} role="alert" aria-live="assertive">
@@ -93,12 +93,12 @@ export default function App() {
             </Alert>
           )}
 
-          <MessageInput onEnviar={enviar} deshabilitado={cargando} rateLimited={rateLimited} />
+          <MessageInput onSend={send} disabled={loading} rateLimited={rateLimited} />
         </Box>
 
         <ToolPanel conversationId={conversationId} refreshKey={refreshKey} tokensLive={tokensLive} dark={dark} />
 
-        <Backdrop open={cargandoConversation} sx={{ zIndex: 50 }}>
+        <Backdrop open={loadingConversation} sx={{ zIndex: 50 }}>
           <Paper
             elevation={8}
             sx={{
@@ -111,7 +111,7 @@ export default function App() {
             }}
           >
             <CircularProgress size={20} />
-            <Typography variant="body2">Cargando conversación…</Typography>
+            <Typography variant="body2">Loading conversation…</Typography>
           </Paper>
         </Backdrop>
       </Box>

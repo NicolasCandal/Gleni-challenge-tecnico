@@ -1,42 +1,42 @@
 const { z } = require('zod')
 
-const TIPOS_VALIDOS = ['oficial', 'blue', 'bolsa', 'contadoconliqui', 'mayorista', 'cripto', 'tarjeta']
+const VALID_RATE_TYPES = ['official', 'blue', 'mep', 'ccl', 'wholesale', 'crypto', 'card']
 
-const EsquemaRateTypes = z
-  .array(z.enum(TIPOS_VALIDOS))
+const RateTypesSchema = z
+  .array(z.enum(VALID_RATE_TYPES))
   .optional()
 
-const EsquemaCotizacion = z.object({
-  casa: z.string(),
-  nombre: z.string(),
-  compra: z.number(),
-  venta: z.number(),
-  fechaActualizacion: z.string(),
+const QuoteSchema = z.object({
+  rateType: z.string(),
+  name: z.string(),
+  buy: z.number(),
+  sell: z.number(),
+  updatedAt: z.string(),
   spread: z.number(),
-  brecha: z.number().nullable(),
-  senial: z.enum(['comprar', 'esperar', 'neutral'])
+  gap: z.number().nullable(),
+  signal: z.enum(['buy', 'wait', 'neutral'])
 })
 
-const EsquemaLadoConversion = z.object({
-  tipoCambio: z.number().positive(),
-  resultado: z.number()
+const ConversionSideSchema = z.object({
+  exchangeRate: z.number().positive(),
+  result: z.number()
 })
 
-const EsquemaConversion = z.object({
-  monto: z.number(),
-  direccion: z.enum(['USD_A_ARS', 'ARS_A_USD']),
-  tipoUsado: z.string(),
-  referencia: EsquemaLadoConversion,
-  operacion: EsquemaLadoConversion.extend({ lado: z.enum(['compra', 'venta']) })
+const ConversionSchema = z.object({
+  amount: z.number(),
+  direction: z.enum(['USD_TO_ARS', 'ARS_TO_USD']),
+  rateUsed: z.string(),
+  reference: ConversionSideSchema,
+  transaction: ConversionSideSchema.extend({ side: z.enum(['buy', 'sell']) })
 })
 
-const EsquemaSalidaCotizaciones = z.object({
-  cotizaciones: z.array(EsquemaCotizacion),
-  conversion: EsquemaConversion.nullable(),
-  omitidos: z.array(z.string()),
-  advertencia: z.string().nullable(),
-  fuente: z.string(),
+const ExchangeOutputSchema = z.object({
+  quotes: z.array(QuoteSchema),
+  conversion: ConversionSchema.nullable(),
+  omitted: z.array(z.string()),
+  warning: z.string().nullable(),
+  source: z.string(),
   timestamp: z.string()
 })
 
-module.exports = { EsquemaRateTypes, EsquemaCotizacion, EsquemaConversion, EsquemaSalidaCotizaciones }
+module.exports = { RateTypesSchema, QuoteSchema, ConversionSchema, ExchangeOutputSchema }

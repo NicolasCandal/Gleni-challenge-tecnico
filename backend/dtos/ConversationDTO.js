@@ -1,13 +1,13 @@
-function crearConversacionDTO(fila) {
+function createConversationDTO(row) {
   return {
-    id: fila.id,
-    titulo: fila.titulo ?? null,
-    creadoEn: fila.created_at,
+    id: row.id,
+    title: row.title ?? null,
+    createdAt: row.created_at,
   }
 }
 
-function crearRespuestaConversacionesDTO(conversaciones) {
-  return { conversaciones }
+function createConversationsResponseDTO(conversations) {
+  return { conversations }
 }
 
-module.exports = { crearConversacionDTO, crearRespuestaConversacionesDTO }
+module.exports = { createConversationDTO, createConversationsResponseDTO }

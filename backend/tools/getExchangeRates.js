@@ -1,95 +1,79 @@
 const { fetchExchangeRates } = require('../infrastructure/dolarapiClient')
-const { rawACotizaciones } = require('../mappers/exchangeMapper')
-const { calcularSpreads, calcularBrecha, ordenarParaComprar, agregarSenial, filtrarPorTipos } = require('../services/exchangeService')
-const { EsquemaRateTypes, EsquemaSalidaCotizaciones } = require('../schemas/exchangeSchema')
-const { crearConversionDTO, crearSalidaCotizacionesDTO } = require('../dtos/ExchangeDTO')
+const { rawToQuotes } = require('../mappers/exchangeMapper')
+const { calculateSpreads, calculateGap, sortBySellPrice, addSignals, filterByTypes } = require('../services/exchangeService')
+const { RateTypesSchema, ExchangeOutputSchema } = require('../schemas/exchangeSchema')
+const { createConversionDTO, createExchangeOutputDTO } = require('../dtos/ExchangeDTO')
+const { calculateConversionValues } = require('../services/conversionService')
 
-const TIPOS_NO_OPERABLES = ['mayorista']
+const NON_RETAIL_TYPES = ['wholesale']
 
-const definicion = {
+const definition = {
   name: 'get_exchange_rates',
-  description: 'Obtiene las cotizaciones actuales del dólar en Argentina. Cada cotización incluye spread, brecha con el oficial y señal (comprar/esperar/neutral). Si se pasa amount, calcula la conversión en el servidor y devuelve dos valores: referencia (al precio de venta, el que citan los medios) y operacion (el resultado neto que recibiría/pagaría el usuario si ejecutara la transacción).',
+  description: 'Get current US dollar exchange rates in Argentina, including the spread, gap against the official rate, and a buy/wait/neutral signal. With amount, return a reference conversion at the sell rate and the actual transaction amount the user would receive or pay.',
   parameters: {
     type: 'object',
     properties: {
       rate_types: {
         type: 'array',
-        items: { type: 'string', enum: ['oficial', 'blue', 'bolsa', 'contadoconliqui', 'mayorista', 'cripto', 'tarjeta'] },
-        description: 'Tipos de dólar a consultar. Si se omite, devuelve todos.'
+        items: { type: 'string', enum: ['official', 'blue', 'mep', 'ccl', 'wholesale', 'crypto', 'card'] },
+        description: 'Dollar rate types to look up. Omit to return all types.'
       },
       amount: {
         type: 'number',
-        description: 'Monto a convertir. Si se omite, no se calcula conversión. La respuesta incluirá conversion.referencia.resultado (al precio de venta) y conversion.operacion.resultado (al precio que le corresponde al usuario en la transacción real).'
+        description: 'Amount to convert. Omit to skip conversion. Return conversion.reference.result at the sell rate and conversion.transaction.result at the rate applicable to the transaction.'
       },
       direction: {
         type: 'string',
-        enum: ['USD_A_ARS', 'ARS_A_USD'],
-        description: 'Dirección de la conversión. Default: USD_A_ARS.'
+        enum: ['USD_TO_ARS', 'ARS_TO_USD'],
+        description: 'Conversion direction. Defaults to USD_TO_ARS.'
       }
     },
     required: []
   }
 }
 
-function calcularConversion(cotizaciones, monto, direccion) {
-  const tipoUsado = cotizaciones[0]
-  if (!tipoUsado) return null
+function calculateConversion(quotes, amount, direction) {
+  const rateUsed = quotes[0]
+  if (!rateUsed) return null
 
-  const esUsdAars = direccion !== 'ARS_A_USD'
-  const redondear = (x) => Math.round(x * 100) / 100
+  const isUsdToArs = direction !== 'ARS_TO_USD'
 
-  // referencia: siempre al precio de venta (el que citan los medios)
-  const refTipoCambio = tipoUsado.venta
-  const refResultado = esUsdAars
-    ? redondear(monto * refTipoCambio)
-    : redondear(monto / refTipoCambio)
-
-  // operacion: precio que le toca al usuario en la transacción real
-  // USD_A_ARS → usuario vende USD → casa le compra → precio compra
-  // ARS_A_USD → usuario compra USD → casa le vende → precio venta
-  const opLado = esUsdAars ? 'compra' : 'venta'
-  const opTipoCambio = esUsdAars ? tipoUsado.compra : tipoUsado.venta
-  const opResultado = esUsdAars
-    ? redondear(monto * opTipoCambio)
-    : redondear(monto / opTipoCambio)
-
-  return crearConversionDTO({
-    monto,
-    direccion: esUsdAars ? 'USD_A_ARS' : 'ARS_A_USD',
-    tipoUsado: tipoUsado.nombre,
-    referencia: { tipoCambio: refTipoCambio, resultado: refResultado },
-    operacion: { lado: opLado, tipoCambio: opTipoCambio, resultado: opResultado }
+  return createConversionDTO({
+    amount,
+    direction: isUsdToArs ? 'USD_TO_ARS' : 'ARS_TO_USD',
+    rateUsed: rateUsed.name,
+    ...calculateConversionValues(rateUsed, amount, isUsdToArs)
   })
 }
 
-async function manejador({ rate_types, amount, direction } = {}, _contexto) {
-  EsquemaRateTypes.parse(rate_types)
+async function handler({ rate_types, amount, direction } = {}, _context) {
+  RateTypesSchema.parse(rate_types)
 
-  const { datos, fuente, esFallback } = await fetchExchangeRates()
-  const mapeado = rawACotizaciones(datos, fuente, esFallback)
+  const { data, source, isFallback } = await fetchExchangeRates()
+  const mapped = rawToQuotes(data, source, isFallback)
 
-  let cotizaciones = calcularSpreads(mapeado.cotizaciones)
-  cotizaciones = calcularBrecha(cotizaciones)
-  cotizaciones = agregarSenial(cotizaciones)
-  cotizaciones = filtrarPorTipos(cotizaciones, rate_types)
-  const ordenadas = ordenarParaComprar(cotizaciones)
+  let quotes = calculateSpreads(mapped.quotes)
+  quotes = calculateGap(quotes)
+  quotes = addSignals(quotes)
+  quotes = filterByTypes(quotes, rate_types)
+  const sorted = sortBySellPrice(quotes)
 
-  const tieneRateTypes = Array.isArray(rate_types) && rate_types.length > 0
-  const operables = tieneRateTypes ? ordenadas : ordenadas.filter(c => !TIPOS_NO_OPERABLES.includes(c.casa))
-  const baseConversion = operables.length > 0 ? operables : ordenadas
+  const hasRateTypes = Array.isArray(rate_types) && rate_types.length > 0
+  const retailQuotes = hasRateTypes ? sorted : sorted.filter(c => !NON_RETAIL_TYPES.includes(c.rateType))
+  const baseConversion = retailQuotes.length > 0 ? retailQuotes : sorted
 
-  const conversion = amount != null ? calcularConversion(baseConversion, amount, direction) : null
+  const conversion = amount != null ? calculateConversion(baseConversion, amount, direction) : null
 
-  const salida = crearSalidaCotizacionesDTO({
-    cotizaciones: ordenadas,
+  const output = createExchangeOutputDTO({
+    quotes: sorted,
     conversion,
-    omitidos: mapeado.omitidos,
-    advertencia: mapeado.advertencia,
-    fuente: mapeado.fuente,
-    timestamp: mapeado.timestamp
+    omitted: mapped.omitted,
+    warning: mapped.warning,
+    source: mapped.source,
+    timestamp: mapped.timestamp
   })
 
-  return EsquemaSalidaCotizaciones.parse(salida)
+  return ExchangeOutputSchema.parse(output)
 }
 
-module.exports = { definicion, manejador }
+module.exports = { definition, handler }

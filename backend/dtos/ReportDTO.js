@@ -1,5 +1,5 @@
-function crearReporteDTO({ idConversacion, totalConsultas, usoHerramientas, latenciaPromedioMs, tiposConsultados, errores, totalEjecuciones }) {
-  return { idConversacion, totalConsultas, usoHerramientas, latenciaPromedioMs, tiposConsultados, errores, totalEjecuciones }
+function createReportDTO({ conversationId, totalQueries, toolUsage, averageLatencyMs, queriedTypes, errors, totalExecutions }) {
+  return { conversationId, totalQueries, toolUsage, averageLatencyMs, queriedTypes, errors, totalExecutions }
 }
 
-module.exports = { crearReporteDTO }
+module.exports = { createReportDTO }

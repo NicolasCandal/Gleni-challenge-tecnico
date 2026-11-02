@@ -1,51 +1,51 @@
-// Las rutas son relativas: en produccion frontend y backend comparten dominio en Vercel;
-// en desarrollo el proxy de vite.config.ts reenvia /api -> http://localhost:3000.
+// Relative URLs share the same domain on Vercel in production.
+// In development, the Vite proxy forwards /api to http://localhost:3000.
 
-export interface EjecucionHerramienta {
+export interface ToolExecution {
   id: string
-  herramienta: string
+  tool: string
   input: unknown
   output: unknown
-  latenciaMs: number
-  tokensUsados: number | null
+  latencyMs: number
+  tokensUsed: number | null
   error: string | null
-  creadoEn: string
+  createdAt: string
 }
 
-export async function fetchEjecuciones(conversationId: string): Promise<EjecucionHerramienta[]> {
-  const respuesta = await fetch(`/api/sessions/${conversationId}/executions`)
-  if (!respuesta.ok) return []
-  const { ejecuciones } = await respuesta.json()
-  return ejecuciones ?? []
+export async function fetchExecutions(conversationId: string): Promise<ToolExecution[]> {
+  const response = await fetch(`/api/sessions/${conversationId}/executions`)
+  if (!response.ok) return []
+  const { executions } = await response.json()
+  return executions ?? []
 }
 
-export interface MensajeDTO {
+export interface MessageDTO {
   id: string
   role: 'user' | 'assistant'
   content: string
-  creadoEn: string
+  createdAt: string
   feedback?: 'up' | 'down' | null
 }
 
-export async function fetchMensajes(conversationId: string): Promise<MensajeDTO[]> {
-  const respuesta = await fetch(`/api/sessions/${conversationId}/messages`)
-  if (!respuesta.ok) return []
-  const { mensajes } = await respuesta.json()
-  return mensajes ?? []
+export async function fetchMessages(conversationId: string): Promise<MessageDTO[]> {
+  const response = await fetch(`/api/sessions/${conversationId}/messages`)
+  if (!response.ok) return []
+  const { messages } = await response.json()
+  return messages ?? []
 }
 
-export interface ConversacionDTO {
+export interface ConversationDTO {
   id: string
-  titulo: string | null
-  creadoEn: string
+  title: string | null
+  createdAt: string
 }
 
-export async function fetchConversaciones(ids: string[]): Promise<ConversacionDTO[]> {
+export async function fetchConversations(ids: string[]): Promise<ConversationDTO[]> {
   if (ids.length === 0) return []
-  const respuesta = await fetch(`/api/conversations?ids=${ids.join(',')}`)
-  if (!respuesta.ok) return []
-  const { conversaciones } = await respuesta.json()
-  return conversaciones ?? []
+  const response = await fetch(`/api/conversations?ids=${ids.join(',')}`)
+  if (!response.ok) return []
+  const { conversations } = await response.json()
+  return conversations ?? []
 }
 
 export class HttpError extends Error {
@@ -55,91 +55,91 @@ export class HttpError extends Error {
   }
 }
 
-export type EventoSSE =
-  | { tipo: 'chunk'; texto: string }
-  | { tipo: 'fin'; conversationId: string; assistantMessageId?: string; titulo?: string | null }
-  | { tipo: 'usage'; tokens: number }
-  | { tipo: 'error'; mensaje: string; status?: number }
-  | { tipo: 'tool_start'; herramienta: string }
+export type SSEEvent =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; conversationId: string; assistantMessageId?: string; title?: string | null }
+  | { type: 'usage'; tokens: number }
+  | { type: 'error'; message: string; status?: number }
+  | { type: 'tool_start'; tool: string }
 
-export type FeedbackValor = 'up' | 'down'
+export type FeedbackValue = 'up' | 'down'
 
-export async function enviarFeedbackMensaje(messageId: string, feedback: FeedbackValor): Promise<void> {
-  const respuesta = await fetch(`/api/messages/${messageId}/feedback`, {
+export async function sendMessageFeedback(messageId: string, feedback: FeedbackValue): Promise<void> {
+  const response = await fetch(`/api/messages/${messageId}/feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ feedback })
   })
 
-  if (!respuesta.ok) {
-    const texto = await respuesta.text().catch(() => '')
-    throw new HttpError(respuesta.status, texto || `Error inesperado (${respuesta.status})`)
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new HttpError(response.status, text || `Unexpected error (${response.status})`)
   }
 }
 
-export async function updateConversacionTitulo(id: string, titulo: string): Promise<void> {
-  const respuesta = await fetch(`/api/conversations/${id}`, {
+export async function updateConversationTitle(id: string, title: string): Promise<void> {
+  const response = await fetch(`/api/conversations/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ titulo }),
+    body: JSON.stringify({ title }),
   })
-  if (!respuesta.ok) {
-    throw new HttpError(respuesta.status, `Error al actualizar titulo (${respuesta.status})`)
+  if (!response.ok) {
+    throw new HttpError(response.status, `Could not update title (${response.status})`)
   }
 }
 
 export async function fetchStream(
   conversationId: string | null,
-  mensaje: string,
-  onEvento: (evento: EventoSSE) => void,
+  message: string,
+  onEvent: (event: SSEEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const respuesta = await fetch(`/api/chat`, {
+  const response = await fetch(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...(conversationId ? { conversationId } : {}), mensaje }),
+    body: JSON.stringify({ ...(conversationId ? { conversationId } : {}), message }),
     signal,
   })
 
-  if (!respuesta.ok) {
-    const mensajesPorCodigo: Record<number, string> = {
-      429: 'Limite de consultas alcanzado. Espera un momento antes de volver a intentar.',
-      503: 'La API de cotizaciones no esta disponible en este momento.',
-      500: 'Error interno del servidor. Intenta de nuevo en unos segundos.',
+  if (!response.ok) {
+    const messagesByStatus: Record<number, string> = {
+      429: 'Request limit reached. Please wait a moment and try again.',
+      503: 'The exchange rate service is currently unavailable.',
+      500: 'Something went wrong on the server. Please try again in a few seconds.',
     }
-    const textoError = mensajesPorCodigo[respuesta.status] ?? `Error inesperado (${respuesta.status})`
-    throw new HttpError(respuesta.status, textoError)
+    const errorText = messagesByStatus[response.status] ?? `Unexpected error (${response.status})`
+    throw new HttpError(response.status, errorText)
   }
 
-  if (!respuesta.body) throw new Error('El servidor no devolvio un stream')
+  if (!response.body) throw new Error('The server did not return a stream')
 
-  const lector = respuesta.body.getReader()
-  const decodificador = new TextDecoder()
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
   let buffer = ''
 
   while (true) {
-    const { done, value } = await lector.read()
+    const { done, value } = await reader.read()
     if (done) break
 
-    buffer += decodificador.decode(value, { stream: true })
-    const lineas = buffer.split('\n\n')
-    buffer = lineas.pop() ?? ''
+    buffer += decoder.decode(value, { stream: true })
+    const frames = buffer.split('\n\n')
+    buffer = frames.pop() ?? ''
 
-    for (const linea of lineas) {
-      if (!linea.startsWith('data: ')) continue
+    for (const frame of frames) {
+      if (!frame.startsWith('data: ')) continue
       try {
-        const evento = JSON.parse(linea.slice(6)) as EventoSSE
-        onEvento(evento)
+        const event = JSON.parse(frame.slice(6)) as SSEEvent
+        onEvent(event)
       } catch {
-        // ignorar lineas malformadas
+        // Ignore malformed frames.
       }
     }
   }
 }
 
-export async function deleteConversacion(id: string): Promise<void> {
-  const respuesta = await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
-  if (!respuesta.ok && respuesta.status !== 404) {
-    throw new HttpError(respuesta.status, `Error al eliminar conversacion (${respuesta.status})`)
+export async function deleteConversation(id: string): Promise<void> {
+  const response = await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
+  if (!response.ok && response.status !== 404) {
+    throw new HttpError(response.status, `Could not delete conversation (${response.status})`)
   }
 }

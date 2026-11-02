@@ -1,16 +1,16 @@
 const supabase = require('../infrastructure/supabaseClient')
 
-async function crear({ idConversacion, nombreHerramienta, entrada, salida, latenciaMs, tokensUsados = null, errorMsg = null }) {
+async function create({ conversationId, toolName, input, output, latencyMs, tokensUsed = null, errorMessage = null }) {
   const { data, error } = await supabase
     .from('tool_executions')
     .insert({
-      conversation_id: idConversacion,
-      tool_name: nombreHerramienta,
-      input: entrada,
-      output: salida,
-      latency_ms: latenciaMs,
-      tokens_used: tokensUsados,
-      error: errorMsg
+      conversation_id: conversationId,
+      tool_name: toolName,
+      input: input,
+      output: output,
+      latency_ms: latencyMs,
+      tokens_used: tokensUsed,
+      error: errorMessage
     })
     .select()
     .single()
@@ -19,11 +19,12 @@ async function crear({ idConversacion, nombreHerramienta, entrada, salida, laten
   return data
 }
 
-async function listarPorConversacion(idConversacion) {
+async function listByConversation(conversationId) {
   const { data, error } = await supabase
     .from('tool_executions')
     .select('*')
-    .eq('conversation_id', idConversacion)
+    .eq('conversation_id', conversationId)
+    .neq('tool_name', '_turn')
     .neq('tool_name', '_turno')
     .order('created_at', { ascending: true })
 
@@ -31,4 +32,4 @@ async function listarPorConversacion(idConversacion) {
   return data
 }
 
-module.exports = { crear, listarPorConversacion }
+module.exports = { create, listByConversation }

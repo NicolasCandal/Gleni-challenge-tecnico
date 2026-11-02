@@ -1,5 +1,5 @@
 class ExternalApiError extends Error {
-  constructor(message = 'Servicio de cotizaciones no disponible') {
+  constructor(message = 'The exchange rate service is unavailable') {
     super(message)
     this.name = 'ExternalApiError'
     this.status = 503

@@ -1,5 +1,5 @@
 {
-  "name": "asesor-de-cambio-de-divisas",
+  "name": "currency-exchange-advisor",
   "version": "1.0.0",
   "scripts": {
     "dev": "nodemon backend/server.js",

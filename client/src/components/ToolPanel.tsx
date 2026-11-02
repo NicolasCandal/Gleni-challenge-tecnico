@@ -10,7 +10,7 @@ import {
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { fetchEjecuciones, EjecucionHerramienta } from '../services/api'
+import { fetchExecutions, ToolExecution } from '../services/api'
 
 interface Props {
   conversationId: string | null
@@ -19,10 +19,10 @@ interface Props {
   dark: boolean
 }
 
-function PayloadColapsable({ label, datos, dark }: { label: string; datos: unknown; dark: boolean }) {
-  const [expandido, setExpandido] = useState(false)
-  const texto = JSON.stringify(datos, null, 2)
-  const truncado = texto.length > 500 && !expandido
+function CollapsiblePayload({ label, data, dark }: { label: string; data: unknown; dark: boolean }) {
+  const [expanded, setExpanded] = useState(false)
+  const text = JSON.stringify(data, null, 2)
+  const truncated = text.length > 500 && !expanded
 
   return (
     <Box sx={{ mt: 0.5 }}>
@@ -39,29 +39,29 @@ function PayloadColapsable({ label, datos, dark }: { label: string; datos: unkno
         }}
         className={dark ? 'bg-gray-950 text-gray-200' : 'bg-white text-gray-600'}
       >
-        {truncado ? texto.slice(0, 500) + '…' : texto}
+        {truncated ? text.slice(0, 500) + '…' : text}
       </pre>
-      {texto.length > 500 && (
+      {text.length > 500 && (
         <button
-          onClick={() => setExpandido(p => !p)}
+          onClick={() => setExpanded(p => !p)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              setExpandido(p => !p)
+              setExpanded(p => !p)
             }
           }}
           className="text-xs text-blue-500 hover:underline mt-0.5 focus:outline-none focus:ring-2 focus:ring-offset-1 rounded"
-          aria-expanded={expandido}
-          aria-label={`${expandido ? 'Ver menos' : 'Ver más'} ${label}`}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? 'Show less' : 'Show more'} ${label}`}
         >
-          {expandido ? 'Ver menos' : 'Ver más'}
+          {expanded ? 'Show less' : 'Show more'}
         </button>
       )}
     </Box>
   )
 }
 
-function TarjetaEjecucion({ ejec, dark }: { ejec: EjecucionHerramienta; dark: boolean }) {
+function ExecutionCard({ execution, dark }: { execution: ToolExecution; dark: boolean }) {
   return (
     <Accordion
       disableGutters
@@ -78,7 +78,7 @@ function TarjetaEjecucion({ ejec, dark }: { ejec: EjecucionHerramienta; dark: bo
     >
       <AccordionSummary
         expandIcon={<ExpandMoreIcon fontSize="small" />}
-        aria-label={`${ejec.herramienta} - Presiona para ver detalles`}
+        aria-label={`${execution.tool} - Expand for details`}
         sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 0.5, overflow: 'hidden' } }}
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -86,19 +86,19 @@ function TarjetaEjecucion({ ejec, dark }: { ejec: EjecucionHerramienta; dark: bo
             variant="caption"
             sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: dark ? '#f9fafb' : 'text.primary' }}
           >
-            {ejec.herramienta}
+            {execution.tool}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Typography variant="caption" sx={{ color: dark ? '#cbd5e1' : 'text.secondary' }} title="Latencia">
-              {ejec.latenciaMs} ms
+            <Typography variant="caption" sx={{ color: dark ? '#cbd5e1' : 'text.secondary' }} title="Latency">
+              {execution.latencyMs} ms
             </Typography>
-            {ejec.tokensUsados != null && (
-              <Typography variant="caption" sx={{ color: dark ? '#cbd5e1' : 'text.secondary' }} title="Tokens usados">
-                {ejec.tokensUsados} tokens
+            {execution.tokensUsed != null && (
+              <Typography variant="caption" sx={{ color: dark ? '#cbd5e1' : 'text.secondary' }} title="Tokens used">
+                {execution.tokensUsed} tokens
               </Typography>
             )}
-            {ejec.error && (
-              <Typography variant="caption" color="error" title={ejec.error}>
+            {execution.error && (
+              <Typography variant="caption" color="error" title={execution.error}>
                 Error
               </Typography>
             )}
@@ -107,29 +107,29 @@ function TarjetaEjecucion({ ejec, dark }: { ejec: EjecucionHerramienta; dark: bo
       </AccordionSummary>
 
       <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 1.5, borderTop: 1, borderColor: 'divider' }}>
-        {ejec.error && (
+        {execution.error && (
           <Typography variant="caption" color="error" component="p" sx={{ mb: 1 }}>
-            {ejec.error}
+            {execution.error}
           </Typography>
         )}
-        {ejec.input != null && <PayloadColapsable label="Entrada" datos={ejec.input} dark={dark} />}
-        {ejec.output != null && <PayloadColapsable label="Salida" datos={ejec.output} dark={dark} />}
+        {execution.input != null && <CollapsiblePayload label="Input" data={execution.input} dark={dark} />}
+        {execution.output != null && <CollapsiblePayload label="Output" data={execution.output} dark={dark} />}
       </AccordionDetails>
     </Accordion>
   )
 }
 
 export function ToolPanel({ conversationId, refreshKey, tokensLive, dark }: Props) {
-  const [abierto, setAbierto] = useState(true)
-  const [ejecuciones, setEjecuciones] = useState<EjecucionHerramienta[]>([])
+  const [open, setOpen] = useState(true)
+  const [executions, setExecutions] = useState<ToolExecution[]>([])
 
   useEffect(() => {
     if (!conversationId) {
-      setEjecuciones([])
-      setAbierto(true)
+      setExecutions([])
+      setOpen(true)
       return
     }
-    fetchEjecuciones(conversationId).then(setEjecuciones)
+    fetchExecutions(conversationId).then(setExecutions)
   }, [conversationId, refreshKey])
 
   return (
@@ -142,35 +142,35 @@ export function ToolPanel({ conversationId, refreshKey, tokensLive, dark }: Prop
         borderColor: dark ? '#374151' : 'divider',
         bgcolor: dark ? '#0f172a' : 'background.paper',
         transition: 'width 300ms',
-        width: abierto ? 288 : 40,
+        width: open ? 288 : 40,
         overflow: 'hidden',
         flexShrink: 0,
       }}
     >
       <IconButton
-        onClick={() => setAbierto(p => !p)}
-        title={abierto ? 'Cerrar panel' : 'Abrir panel'}
-        aria-expanded={abierto}
-        aria-label={`${abierto ? 'Cerrar' : 'Abrir'} panel de herramientas`}
+        onClick={() => setOpen(p => !p)}
+        title={open ? 'Close panel' : 'Open panel'}
+        aria-expanded={open}
+        aria-label={`${open ? 'Close' : 'Open'} tool panel`}
         aria-controls="tool-panel-content"
         size="small"
         sx={{ height: 40, borderRadius: 0, color: dark ? '#e5e7eb' : 'text.secondary' }}
       >
-        {abierto ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        {open ? <ChevronRightIcon /> : <ChevronLeftIcon />}
       </IconButton>
 
-      {abierto && (
+      {open && (
         <Box
           id="tool-panel-content"
           sx={{ flex: 1, overflowY: 'auto', px: 1.5, pb: 2, color: dark ? '#e5e7eb' : 'text.primary' }}
           role="region"
-          aria-label="Detalles de herramientas y tokens"
+          aria-label="Tool and token details"
         >
           <Typography
             variant="overline"
             sx={{ display: 'block', mb: 1, color: dark ? '#cbd5e1' : 'text.secondary' }}
           >
-            Herramientas
+            Tools
           </Typography>
 
           {tokensLive != null && (
@@ -185,7 +185,7 @@ export function ToolPanel({ conversationId, refreshKey, tokensLive, dark }: Prop
               <Box
                 component="span"
                 sx={{ fontWeight: 'medium', color: dark ? '#f9fafb' : 'text.primary' }}
-                aria-label={`${tokensLive} tokens utilizados`}
+                aria-label={`${tokensLive} tokens used`}
               >
                 {tokensLive}
               </Box>
@@ -194,18 +194,18 @@ export function ToolPanel({ conversationId, refreshKey, tokensLive, dark }: Prop
 
           {!conversationId && (
             <Typography variant="caption" sx={{ fontStyle: 'italic', color: dark ? '#94a3b8' : 'text.secondary' }}>
-              Sin conversación activa
+              No active conversation
             </Typography>
           )}
 
-          {conversationId && ejecuciones.length === 0 && (
+          {conversationId && executions.length === 0 && (
             <Typography variant="caption" sx={{ fontStyle: 'italic', color: dark ? '#94a3b8' : 'text.secondary' }}>
-              Sin ejecuciones aún
+              No tool calls yet
             </Typography>
           )}
 
-          {ejecuciones.map(ejec => (
-            <TarjetaEjecucion key={ejec.id} ejec={ejec} dark={dark} />
+          {executions.map(execution => (
+            <ExecutionCard key={execution.id} execution={execution} dark={dark} />
           ))}
         </Box>
       )}

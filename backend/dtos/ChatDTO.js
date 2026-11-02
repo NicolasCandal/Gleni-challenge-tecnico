@@ -1,21 +1,21 @@
-function eventoChunk(texto) {
-  return { tipo: 'chunk', texto }
+function chunkEvent(text) {
+  return { type: 'chunk', text }
 }
 
-function eventoUsage(tokens) {
-  return { tipo: 'usage', tokens }
+function usageEvent(tokens) {
+  return { type: 'usage', tokens }
 }
 
-function eventoToolStart(herramienta) {
-  return { tipo: 'tool_start', herramienta }
+function toolStartEvent(tool) {
+  return { type: 'tool_start', tool }
 }
 
-function eventoError(mensaje, status) {
-  return { tipo: 'error', mensaje, status: status || 500 }
+function errorEvent(message, status) {
+  return { type: 'error', message, status: status || 500 }
 }
 
-function eventoFin(conversationId, assistantMessageId, titulo) {
-  return { tipo: 'fin', conversationId, assistantMessageId, titulo: titulo || null }
+function doneEvent(conversationId, assistantMessageId, title) {
+  return { type: 'done', conversationId, assistantMessageId, title: title || null }
 }
 
-module.exports = { eventoChunk, eventoUsage, eventoToolStart, eventoError, eventoFin }
+module.exports = { chunkEvent, usageEvent, toolStartEvent, errorEvent, doneEvent }

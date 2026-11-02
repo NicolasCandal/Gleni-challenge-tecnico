@@ -2,29 +2,29 @@ import { useState, useRef, useEffect } from 'react'
 import { Box, TextField, Button } from '@mui/material'
 
 interface Props {
-  onEnviar: (texto: string) => void
-  deshabilitado: boolean
+  onSend: (text: string) => void
+  disabled: boolean
   rateLimited?: boolean
 }
 
-export function MessageInput({ onEnviar, deshabilitado, rateLimited = false }: Props) {
-  const [texto, setTexto] = useState('')
+export function MessageInput({ onSend, disabled, rateLimited = false }: Props) {
+  const [text, setText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!deshabilitado) inputRef.current?.focus()
-  }, [deshabilitado])
+    if (!disabled) inputRef.current?.focus()
+  }, [disabled])
 
-  const enviar = () => {
-    if (!texto.trim() || deshabilitado) return
-    onEnviar(texto.trim())
-    setTexto('')
+  const send = () => {
+    if (!text.trim() || disabled) return
+    onSend(text.trim())
+    setText('')
   }
 
-  const manejarTecla = (e: React.KeyboardEvent) => {
+  const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      enviar()
+      send()
     }
   }
 
@@ -43,34 +43,34 @@ export function MessageInput({ onEnviar, deshabilitado, rateLimited = false }: P
     >
       <TextField
         inputRef={inputRef}
-        value={texto}
-        onChange={e => setTexto(e.target.value)}
-        onKeyDown={manejarTecla}
-        disabled={deshabilitado || rateLimited}
-        placeholder={rateLimited ? 'Límite alcanzado, esperá un momento…' : 'Escribí tu consulta... (Enter para enviar)'}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={handleKey}
+        disabled={disabled || rateLimited}
+        placeholder={rateLimited ? 'Request limit reached. Please wait a moment…' : 'Ask a question… (Enter to send)'}
         multiline
         maxRows={4}
         size="small"
         fullWidth
         slotProps={{
           htmlInput: {
-            'aria-label': 'Campo de entrada para consultas',
+            'aria-label': 'Message input',
             'aria-describedby': 'textarea-help',
           },
         }}
         sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
       />
       <span id="textarea-help" className="sr-only">
-        Presiona Enter para enviar tu consulta, Shift+Enter para nueva línea
+        Press Enter to send or Shift+Enter for a new line
       </span>
       <Button
         variant="contained"
-        onClick={enviar}
-        disabled={deshabilitado || rateLimited || !texto.trim()}
-        aria-label="Enviar consulta"
+        onClick={send}
+        disabled={disabled || rateLimited || !text.trim()}
+        aria-label="Send message"
         sx={{ borderRadius: '12px', px: 2, py: 1, flexShrink: 0, textTransform: 'none' }}
       >
-        Enviar
+        Send
       </Button>
     </Box>
   )

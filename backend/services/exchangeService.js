@@ -1,55 +1,52 @@
-function calcularSpreads(cotizaciones) {
-  return cotizaciones.map(c => ({
+const THRESHOLDS = require('../config/thresholds')
+
+function calculateSpreads(quotes) {
+  return quotes.map(c => ({
     ...c,
-    spread: Number(((c.venta - c.compra) / c.compra * 100).toFixed(2))
+    spread: Number(((c.sell - c.buy) / c.buy * 100).toFixed(2))
   }))
 }
 
-function calcularBrecha(cotizaciones) {
-  const oficial = cotizaciones.find(c => c.casa === 'oficial')
-  if (!oficial) return cotizaciones.map(c => ({ ...c, brecha: null }))
+function calculateGap(quotes) {
+  const official = quotes.find(c => c.rateType === 'official')
+  if (!official) return quotes.map(c => ({ ...c, gap: null }))
 
-  return cotizaciones.map(c => ({
+  return quotes.map(c => ({
     ...c,
-    brecha: Number(((c.venta - oficial.venta) / oficial.venta * 100).toFixed(2))
+    gap: Number(((c.sell - official.sell) / official.sell * 100).toFixed(2))
   }))
 }
 
-function ordenarParaComprar(cotizaciones) {
-  return [...cotizaciones].sort((a, b) => a.venta - b.venta)
+function sortBySellPrice(quotes) {
+  return [...quotes].sort((a, b) => a.sell - b.sell)
 }
 
-const UMBRALES = require('../config/umbrales')
-
-// Señal por tipo basada en spread (compra-venta del propio tipo) y brecha (vs. oficial).
-// Requiere que cotizaciones ya tenga spread y brecha calculados.
-function obtenerSenial(cotizaciones) {
-  return cotizaciones.map(c => {
-    let senial
-
-    if (c.spread > UMBRALES.SPREAD_ALTO || (c.brecha !== null && c.brecha > UMBRALES.BRECHA_ALTA)) {
-      senial = 'esperar'
-    } else if (c.spread < UMBRALES.SPREAD_BAJO && c.brecha !== null && c.brecha < UMBRALES.BRECHA_BAJA) {
-      senial = 'comprar'
-    } else {
-      senial = 'neutral'
-    }
-
-    return { casa: c.casa, nombre: c.nombre, senial }
-  })
+// Signals use each rate type’s spread and gap against the official rate.
+// Quotes must already include spread and gap values.
+function getSignal(quote) {
+  if (quote.spread > THRESHOLDS.HIGH_SPREAD || (quote.gap !== null && quote.gap > THRESHOLDS.HIGH_GAP)) {
+    return 'wait'
+  }
+  if (quote.spread < THRESHOLDS.LOW_SPREAD && quote.gap !== null && quote.gap < THRESHOLDS.LOW_GAP) {
+    return 'buy'
+  }
+  return 'neutral'
 }
 
-// Embebe el campo senial directamente en cada cotización.
-// Requiere que cotizaciones ya tenga spread y brecha calculados.
-function agregarSenial(cotizaciones) {
-  const seniales = obtenerSenial(cotizaciones)
-  return cotizaciones.map((c, i) => ({ ...c, senial: seniales[i].senial }))
+function getSignals(quotes) {
+  return quotes.map(quote => ({ rateType: quote.rateType, name: quote.name, signal: getSignal(quote) }))
 }
 
-// Si tipos es un array vacío o undefined, devuelve todas las cotizaciones sin filtrar
-function filtrarPorTipos(cotizaciones, tipos) {
-  if (!tipos || tipos.length === 0) return cotizaciones
-  return cotizaciones.filter(c => tipos.includes(c.casa))
+// Attach the signal to each quote.
+// Quotes must already include spread and gap values.
+function addSignals(quotes) {
+  return quotes.map(quote => ({ ...quote, signal: getSignal(quote) }))
 }
 
-module.exports = { calcularSpreads, calcularBrecha, ordenarParaComprar, obtenerSenial, agregarSenial, filtrarPorTipos }
+// An empty or omitted types array returns all quotes.
+function filterByTypes(quotes, types) {
+  if (!types || types.length === 0) return quotes
+  return quotes.filter(c => types.includes(c.rateType))
+}
+
+module.exports = { calculateSpreads, calculateGap, sortBySellPrice, getSignals, addSignals, filterByTypes }

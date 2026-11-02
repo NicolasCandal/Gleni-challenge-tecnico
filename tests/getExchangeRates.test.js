@@ -1,133 +1,133 @@
 jest.mock('../backend/infrastructure/dolarapiClient')
 
 const { fetchExchangeRates } = require('../backend/infrastructure/dolarapiClient')
-const { manejador } = require('../backend/tools/getExchangeRates')
+const { handler } = require('../backend/tools/getExchangeRates')
 
-const datosValidos = [
-  { casa: 'oficial', nombre: 'Oficial', compra: 1000, venta: 1010, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
-  { casa: 'blue',    nombre: 'Blue',    compra: 1150, venta: 1200, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
+const validData = [
+  { rateType: 'official', name: 'Official', buy: 1000, sell: 1010, updatedAt: '2026-01-01T00:00:00.000Z' },
+  { rateType: 'blue',    name: 'Blue',    buy: 1150, sell: 1200, updatedAt: '2026-01-01T00:00:00.000Z' },
 ]
 
 beforeEach(() => {
-  fetchExchangeRates.mockResolvedValue({ datos: datosValidos, fuente: 'dolarapi.com', esFallback: false })
+  fetchExchangeRates.mockResolvedValue({ data: validData, source: 'dolarapi.com', isFallback: false })
 })
 
-describe('manejador — validación de inputs', () => {
-  test('acepta llamada sin parámetros', async () => {
-    await expect(manejador({})).resolves.toBeDefined()
+describe('handler — input validation', () => {
+  test('accepts a call without parameters', async () => {
+    await expect(handler({})).resolves.toBeDefined()
   })
 
-  test('rechaza rate_types con valores fuera del enum', async () => {
-    await expect(manejador({ rate_types: ['invalido'] })).rejects.toThrow()
+  test('rejects unknown rate types', async () => {
+    await expect(handler({ rate_types: ['invalid'] })).rejects.toThrow()
   })
 
-  test('acepta rate_types con valores válidos', async () => {
-    await expect(manejador({ rate_types: ['blue', 'oficial'] })).resolves.toBeDefined()
+  test('accepts valid rate types', async () => {
+    await expect(handler({ rate_types: ['blue', 'official'] })).resolves.toBeDefined()
   })
 })
 
-describe('manejador — transformación correcta', () => {
-  test('devuelve cotizaciones con spread, brecha y señal calculados', async () => {
-    const resultado = await manejador({})
-    expect(resultado.cotizaciones.length).toBeGreaterThan(0)
-    expect(resultado.cotizaciones[0]).toHaveProperty('spread')
-    expect(resultado.cotizaciones[0]).toHaveProperty('brecha')
-    expect(resultado.cotizaciones[0]).toHaveProperty('senial')
+describe('handler — quote processing', () => {
+  test('returns quotes with calculated spreads, gaps, and signals', async () => {
+    const result = await handler({})
+    expect(result.quotes.length).toBeGreaterThan(0)
+    expect(result.quotes[0]).toHaveProperty('spread')
+    expect(result.quotes[0]).toHaveProperty('gap')
+    expect(result.quotes[0]).toHaveProperty('signal')
   })
 
-  test('filtra por rate_types cuando se especifica', async () => {
-    const resultado = await manejador({ rate_types: ['blue'] })
-    expect(resultado.cotizaciones).toHaveLength(1)
-    expect(resultado.cotizaciones[0].casa).toBe('blue')
+  test('filters by rate_types when provided', async () => {
+    const result = await handler({ rate_types: ['blue'] })
+    expect(result.quotes).toHaveLength(1)
+    expect(result.quotes[0].rateType).toBe('blue')
   })
 
-  test('conversion es null cuando no se pasa amount', async () => {
-    const resultado = await manejador({})
-    expect(resultado.conversion).toBeNull()
+  test('returns a null conversion when amount is omitted', async () => {
+    const result = await handler({})
+    expect(result.conversion).toBeNull()
   })
 
-  // Con los datos mock, ordenarParaComprar ordena por venta ascendente:
-  // oficial (venta 1010) queda primero.
-  test('USD_A_ARS: referencia usa venta y operacion usa compra del tipo más barato', async () => {
-    const resultado = await manejador({ amount: 100, direction: 'USD_A_ARS' })
-    const conv = resultado.conversion
+  // With these fixtures, sortBySellPrice places the official quote first:
+  // its sell price is 1010.
+  test('USD_TO_ARS: uses the cheapest sell quote for reference and its buy rate for the transaction', async () => {
+    const result = await handler({ amount: 100, direction: 'USD_TO_ARS' })
+    const conv = result.conversion
     expect(conv).not.toBeNull()
-    expect(conv.monto).toBe(100)
-    expect(conv.direccion).toBe('USD_A_ARS')
-    expect(conv.referencia.tipoCambio).toBe(1010)     // venta oficial
-    expect(conv.referencia.resultado).toBe(101000)    // 100 * 1010
-    expect(conv.operacion.lado).toBe('compra')
-    expect(conv.operacion.tipoCambio).toBe(1000)      // compra oficial
-    expect(conv.operacion.resultado).toBe(100000)     // 100 * 1000
+    expect(conv.amount).toBe(100)
+    expect(conv.direction).toBe('USD_TO_ARS')
+    expect(conv.reference.exchangeRate).toBe(1010)     // official sell rate
+    expect(conv.reference.result).toBe(101000)    // 100 * 1010
+    expect(conv.transaction.side).toBe('buy')
+    expect(conv.transaction.exchangeRate).toBe(1000)      // official buy rate
+    expect(conv.transaction.result).toBe(100000)     // 100 * 1000
   })
 
-  test('ARS_A_USD: referencia y operacion coinciden (ambas usan venta)', async () => {
-    const resultado = await manejador({ amount: 101000, direction: 'ARS_A_USD' })
-    const conv = resultado.conversion
+  test('ARS_TO_USD: reference and transaction both use the sell rate', async () => {
+    const result = await handler({ amount: 101000, direction: 'ARS_TO_USD' })
+    const conv = result.conversion
     expect(conv).not.toBeNull()
-    expect(conv.direccion).toBe('ARS_A_USD')
-    expect(conv.operacion.lado).toBe('venta')
-    expect(conv.referencia.tipoCambio).toBe(conv.operacion.tipoCambio)
-    expect(conv.referencia.resultado).toBe(100)       // 101000 / 1010
-    expect(conv.operacion.resultado).toBe(100)        // 101000 / 1010
+    expect(conv.direction).toBe('ARS_TO_USD')
+    expect(conv.transaction.side).toBe('sell')
+    expect(conv.reference.exchangeRate).toBe(conv.transaction.exchangeRate)
+    expect(conv.reference.result).toBe(100)       // 101000 / 1010
+    expect(conv.transaction.result).toBe(100)        // 101000 / 1010
   })
 
-  test('incluye fuente y timestamp en la respuesta', async () => {
-    const resultado = await manejador({})
-    expect(resultado.fuente).toBe('dolarapi.com')
-    expect(resultado.timestamp).toBeDefined()
+  test('includes the source and timestamp', async () => {
+    const result = await handler({})
+    expect(result.source).toBe('dolarapi.com')
+    expect(result.timestamp).toBeDefined()
   })
 })
 
-describe('manejador — guard mayorista en conversión', () => {
-  const datosConMayorista = [
-    { casa: 'mayorista', nombre: 'Mayorista', compra: 900,  venta: 950,  fechaActualizacion: '2026-01-01T00:00:00.000Z' },
-    { casa: 'oficial',   nombre: 'Oficial',   compra: 1000, venta: 1010, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
-    { casa: 'blue',      nombre: 'Blue',      compra: 1150, venta: 1200, fechaActualizacion: '2026-01-01T00:00:00.000Z' },
+describe('handler — wholesale conversions', () => {
+  const dataWithWholesale = [
+    { rateType: 'wholesale', name: 'Wholesale', buy: 900,  sell: 950,  updatedAt: '2026-01-01T00:00:00.000Z' },
+    { rateType: 'official',   name: 'Official',   buy: 1000, sell: 1010, updatedAt: '2026-01-01T00:00:00.000Z' },
+    { rateType: 'blue',      name: 'Blue',      buy: 1150, sell: 1200, updatedAt: '2026-01-01T00:00:00.000Z' },
   ]
 
   beforeEach(() => {
-    fetchExchangeRates.mockResolvedValue({ datos: datosConMayorista, fuente: 'dolarapi.com', esFallback: false })
+    fetchExchangeRates.mockResolvedValue({ data: dataWithWholesale, source: 'dolarapi.com', isFallback: false })
   })
 
-  test('conversión SIN rate_types no usa el mayorista aunque tenga venta más baja', async () => {
-    const resultado = await manejador({ amount: 100 })
-    expect(resultado.conversion.tipoUsado).not.toBe('Mayorista')
-    expect(resultado.conversion.tipoUsado).toBe('Oficial')
+  test('excludes wholesale from automatic rate selection', async () => {
+    const result = await handler({ amount: 100 })
+    expect(result.conversion.rateUsed).not.toBe('Wholesale')
+    expect(result.conversion.rateUsed).toBe('Official')
   })
 
-  test('conversión CON rate_types: [mayorista] respeta la elección explícita', async () => {
-    const resultado = await manejador({ amount: 100, rate_types: ['mayorista'] })
-    expect(resultado.conversion.tipoUsado).toBe('Mayorista')
+  test('honors an explicit wholesale selection', async () => {
+    const result = await handler({ amount: 100, rate_types: ['wholesale'] })
+    expect(result.conversion.rateUsed).toBe('Wholesale')
   })
 
-  test('cotizaciones devueltas incluyen mayorista sin rate_types', async () => {
-    const resultado = await manejador({ amount: 100 })
-    const casas = resultado.cotizaciones.map(c => c.casa)
-    expect(casas).toContain('mayorista')
+  test('includes wholesale in the returned quotes when no filter is provided', async () => {
+    const result = await handler({ amount: 100 })
+    const rateTypes = result.quotes.map(c => c.rateType)
+    expect(rateTypes).toContain('wholesale')
   })
 
-  test('cotizaciones devueltas incluyen mayorista con rate_types: [mayorista]', async () => {
-    const resultado = await manejador({ amount: 100, rate_types: ['mayorista'] })
-    const casas = resultado.cotizaciones.map(c => c.casa)
-    expect(casas).toContain('mayorista')
+  test('includes wholesale when explicitly requested', async () => {
+    const result = await handler({ amount: 100, rate_types: ['wholesale'] })
+    const rateTypes = result.quotes.map(c => c.rateType)
+    expect(rateTypes).toContain('wholesale')
   })
 })
 
-describe('manejador — respuestas malformadas de la API', () => {
-  test('filtra cotizaciones sin compra o venta en lugar de romper', async () => {
+describe('handler — malformed API responses', () => {
+  test('omits quotes with missing buy or sell prices', async () => {
     fetchExchangeRates.mockResolvedValue({
-      datos: [{ casa: 'oficial', nombre: 'Oficial', compra: null, venta: null, fechaActualizacion: '2026-01-01T00:00:00.000Z' }],
-      fuente: 'dolarapi.com',
-      esFallback: false
+      data: [{ rateType: 'official', name: 'Official', buy: null, sell: null, updatedAt: '2026-01-01T00:00:00.000Z' }],
+      source: 'dolarapi.com',
+      isFallback: false
     })
-    const resultado = await manejador({})
-    expect(resultado.cotizaciones).toHaveLength(0)
-    expect(resultado.omitidos).toContain('Oficial')
+    const result = await handler({})
+    expect(result.quotes).toHaveLength(0)
+    expect(result.omitted).toContain('Official')
   })
 
-  test('lanza error cuando la API falla', async () => {
-    fetchExchangeRates.mockRejectedValue(new Error('API no disponible'))
-    await expect(manejador({})).rejects.toThrow('API no disponible')
+  test('propagates API errors', async () => {
+    fetchExchangeRates.mockRejectedValue(new Error('API unavailable'))
+    await expect(handler({})).rejects.toThrow('API unavailable')
   })
 })

@@ -3,56 +3,56 @@ jest.mock('../backend/infrastructure/openaiClient', () => ({
 }))
 
 jest.mock('../backend/services/sessionService', () => ({
-  crearConversacion: jest.fn(),
-  agregarMensaje: jest.fn(),
-  obtenerHistorial: jest.fn()
+  createConversation: jest.fn(),
+  addMessage: jest.fn(),
+  getHistory: jest.fn()
 }))
 
 jest.mock('../backend/repositories/toolExecutionRepository', () => ({
-  crear: jest.fn()
+  create: jest.fn()
 }))
 
 jest.mock('../backend/repositories/conversationRepository', () => ({
-  actualizarTitulo: jest.fn()
+  updateTitle: jest.fn()
 }))
 
 jest.mock('../backend/tools/getExchangeRates', () => ({
-  definicion: {
+  definition: {
     name: 'get_exchange_rates',
     description: 'mock',
     parameters: { type: 'object', properties: {}, required: [] }
   },
-  manejador: jest.fn()
+  handler: jest.fn()
 }))
 
 jest.mock('../backend/tools/generateReport', () => ({
-  definicion: {
+  definition: {
     name: 'generate_session_report',
     description: 'mock',
     parameters: { type: 'object', properties: {}, required: [] }
   },
-  manejador: jest.fn()
+  handler: jest.fn()
 }))
 
 jest.mock('../backend/prompts/agentPrompt', () => ({
-  promptSistema: 'Eres un asistente de prueba.'
+  systemPrompt: 'You are a test assistant.'
 }))
 
 const { chat } = require('../backend/services/agentService')
-const clienteOpenAI = require('../backend/infrastructure/openaiClient')
-const servicioSesion = require('../backend/services/sessionService')
-const repositorioEjecucion = require('../backend/repositories/toolExecutionRepository')
-const herramientaGetExchangeRates = require('../backend/tools/getExchangeRates')
+const openaiClient = require('../backend/infrastructure/openaiClient')
+const sessionService = require('../backend/services/sessionService')
+const toolExecutionRepository = require('../backend/repositories/toolExecutionRepository')
+const exchangeRatesTool = require('../backend/tools/getExchangeRates')
 
 const ID_CONV = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
-const TEXTO_RESPUESTA = 'El dolar blue cotiza a $1200.'
-const RESULTADO_TOOL = { cotizaciones: [{ casa: 'blue', compra: 1190, venta: 1200 }] }
+const RESPONSE_TEXT = 'The blue dollar sell rate is ARS 1,200.'
+const TOOL_RESULT = { quotes: [{ rateType: 'blue', buy: 1190, sell: 1200 }] }
 
-async function* crearStream(chunks) {
+async function* createStream(chunks) {
   for (const chunk of chunks) yield chunk
 }
 
-const chunksConTool = [
+const chunksWithTool = [
   {
     choices: [{
       delta: {
@@ -68,123 +68,123 @@ const chunksConTool = [
   { usage: { total_tokens: 150 }, choices: [] }
 ]
 
-const chunksConTexto = [
-  { choices: [{ delta: { content: TEXTO_RESPUESTA } }] },
+const chunksWithText = [
+  { choices: [{ delta: { content: RESPONSE_TEXT } }] },
   { usage: { total_tokens: 320 }, choices: [] }
 ]
 
 beforeEach(() => {
   jest.resetAllMocks()
 
-  servicioSesion.crearConversacion.mockResolvedValue({ id: ID_CONV })
-  servicioSesion.agregarMensaje.mockImplementation(({ rol }) =>
-    Promise.resolve({ id: 'msg-' + rol })
+  sessionService.createConversation.mockResolvedValue({ id: ID_CONV })
+  sessionService.addMessage.mockImplementation(({ role }) =>
+    Promise.resolve({ id: 'msg-' + role })
   )
-  servicioSesion.obtenerHistorial.mockResolvedValue([])
+  sessionService.getHistory.mockResolvedValue([])
 
-  repositorioEjecucion.crear.mockResolvedValue({})
-  herramientaGetExchangeRates.manejador.mockResolvedValue(RESULTADO_TOOL)
+  toolExecutionRepository.create.mockResolvedValue({})
+  exchangeRatesTool.handler.mockResolvedValue(TOOL_RESULT)
 
-  clienteOpenAI.chat.completions.create
-    .mockResolvedValueOnce(crearStream(chunksConTool))
-    .mockResolvedValueOnce(crearStream(chunksConTexto))
+  openaiClient.chat.completions.create
+    .mockResolvedValueOnce(createStream(chunksWithTool))
+    .mockResolvedValueOnce(createStream(chunksWithText))
 })
 
-describe('agentService.chat - flujo con tool call', () => {
-  test('realiza dos llamadas a OpenAI cuando la primera devuelve tool_calls', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(clienteOpenAI.chat.completions.create).toHaveBeenCalledTimes(2)
+describe('agentService.chat — tool call flow', () => {
+  test('calls OpenAI twice when the first response contains tool calls', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(openaiClient.chat.completions.create).toHaveBeenCalledTimes(2)
   })
 
-  test('ejecuta el manejador de la herramienta con los argumentos del stream', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(herramientaGetExchangeRates.manejador).toHaveBeenCalledWith(
+  test('passes streamed arguments and conversation context to the tool handler', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(exchangeRatesTool.handler).toHaveBeenCalledWith(
       { rate_types: ['blue'] },
-      { idConversacion: ID_CONV }
+      { conversationId: ID_CONV }
     )
   })
 
-  test('emite tool_start por onChunk antes de ejecutar la herramienta', async () => {
+  test('emits tool_start before executing the tool', async () => {
     const onChunk = jest.fn()
-    await chat(ID_CONV, 'como esta el blue?', onChunk)
+    await chat(ID_CONV, 'What is the blue dollar rate?', onChunk)
     expect(onChunk).toHaveBeenCalledWith({
-      tipo: 'tool_start',
-      herramienta: 'get_exchange_rates'
+      type: 'tool_start',
+      tool: 'get_exchange_rates'
     })
   })
 
-  test('la segunda llamada incluye el mensaje asistente con tool_calls y el resultado de la tool', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    const { messages } = clienteOpenAI.chat.completions.create.mock.calls[1][0]
+  test('includes the assistant tool call and tool result in the second request', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    const { messages } = openaiClient.chat.completions.create.mock.calls[1][0]
     const roles = messages.map(m => m.role)
     expect(roles).toContain('assistant')
     expect(roles).toContain('tool')
   })
 
-  test('el mensaje tool en la segunda llamada contiene la salida del manejador', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    const { messages } = clienteOpenAI.chat.completions.create.mock.calls[1][0]
-    const mensajeTool = messages.find(m => m.role === 'tool')
-    expect(mensajeTool.tool_call_id).toBe('call_test_001')
-    expect(JSON.parse(mensajeTool.content)).toEqual(RESULTADO_TOOL)
+  test('sends the handler output as the tool message in the second request', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    const { messages } = openaiClient.chat.completions.create.mock.calls[1][0]
+    const toolMessage = messages.find(m => m.role === 'tool')
+    expect(toolMessage.tool_call_id).toBe('call_test_001')
+    expect(JSON.parse(toolMessage.content)).toEqual(TOOL_RESULT)
   })
 
-  test('devuelve la respuesta de texto de la segunda llamada como respuesta final', async () => {
-    const resultado = await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(resultado.respuesta).toBe(TEXTO_RESPUESTA)
+  test('returns the second completion as the final response', async () => {
+    const result = await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(result.response).toBe(RESPONSE_TEXT)
   })
 })
 
-describe('agentService.chat - persistencia', () => {
-  test('persiste la ejecucion de la herramienta con nombre, entrada y salida', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(repositorioEjecucion.crear).toHaveBeenCalledWith(
+describe('agentService.chat — persistence', () => {
+  test('saves the tool execution with its name, input, and output', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(toolExecutionRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        idConversacion: ID_CONV,
-        nombreHerramienta: 'get_exchange_rates',
-        entrada: { rate_types: ['blue'] },
-        salida: RESULTADO_TOOL,
-        errorMsg: null
+        conversationId: ID_CONV,
+        toolName: 'get_exchange_rates',
+        input: { rate_types: ['blue'] },
+        output: TOOL_RESULT,
+        errorMessage: null
       })
     )
   })
 
-  test('persiste _turno con los tokens del turno que uso tools (150)', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(repositorioEjecucion.crear).toHaveBeenCalledWith(
+  test('saves token usage for the completion that requested tools (150)', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(toolExecutionRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        idConversacion: ID_CONV,
-        nombreHerramienta: '_turno',
-        tokensUsados: 150
+        conversationId: ID_CONV,
+        toolName: '_turn',
+        tokensUsed: 150
       })
     )
   })
 
-  test('persiste _turno con los tokens del turno final de texto (320)', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(repositorioEjecucion.crear).toHaveBeenCalledWith(
+  test('saves token usage for the final text completion (320)', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(toolExecutionRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        idConversacion: ID_CONV,
-        nombreHerramienta: '_turno',
-        tokensUsados: 320
+        conversationId: ID_CONV,
+        toolName: '_turn',
+        tokensUsed: 320
       })
     )
   })
 
-  test('persiste el mensaje del asistente con la respuesta final de texto', async () => {
-    await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(servicioSesion.agregarMensaje).toHaveBeenCalledWith(
+  test('saves the final assistant message', async () => {
+    await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(sessionService.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        idConversacion: ID_CONV,
-        rol: 'assistant',
-        contenido: TEXTO_RESPUESTA
+        conversationId: ID_CONV,
+        role: 'assistant',
+        content: RESPONSE_TEXT
       })
     )
   })
 
-  test('un fallo en la persistencia de la herramienta no interrumpe la respuesta', async () => {
-    repositorioEjecucion.crear.mockRejectedValueOnce(new Error('DB caida'))
-    const resultado = await chat(ID_CONV, 'como esta el blue?', jest.fn())
-    expect(resultado.respuesta).toBe(TEXTO_RESPUESTA)
+  test('still returns a response if saving the tool execution fails', async () => {
+    toolExecutionRepository.create.mockRejectedValueOnce(new Error('Database unavailable'))
+    const result = await chat(ID_CONV, 'What is the blue dollar rate?', jest.fn())
+    expect(result.response).toBe(RESPONSE_TEXT)
   })
 })

@@ -1,26 +1,26 @@
 const { z } = require('zod')
-const repositorioFeedback = require('../repositories/messageFeedbackRepository')
-const { crearRespuestaFeedbackDTO } = require('../dtos/MessageDTO')
+const feedbackRepository = require('../repositories/messageFeedbackRepository')
+const { createFeedbackResponseDTO } = require('../dtos/MessageDTO')
 
-const EsquemaIdMensaje = z.string().uuid()
+const MessageIdSchema = z.string().uuid()
 
-async function registrarFeedback(req, res, next) {
+async function submitFeedback(req, res, next) {
   try {
-    const resultadoId = EsquemaIdMensaje.safeParse(req.params.id)
-    if (!resultadoId.success) {
-      return res.status(400).json({ error: 'El id del mensaje no es válido' })
+    const idResult = MessageIdSchema.safeParse(req.params.id)
+    if (!idResult.success) {
+      return res.status(400).json({ error: 'The message ID must be a valid UUID' })
     }
 
     const { feedback } = req.body
-    const feedbackGuardado = await repositorioFeedback.crearOActualizar({
-      idMensaje: resultadoId.data,
+    const savedFeedback = await feedbackRepository.upsert({
+      messageId: idResult.data,
       feedback
     })
 
-    res.status(201).json(crearRespuestaFeedbackDTO(feedbackGuardado))
+    res.status(201).json(createFeedbackResponseDTO(savedFeedback))
   } catch (err) {
     next(err)
   }
 }
 
-module.exports = { registrarFeedback }
+module.exports = { submitFeedback }

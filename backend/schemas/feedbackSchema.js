@@ -1,7 +1,7 @@
 const { z } = require('zod')
 
-const EsquemaFeedback = z.object({
+const FeedbackSchema = z.object({
   feedback: z.enum(['up', 'down'])
 })
 
-module.exports = { EsquemaFeedback }
+module.exports = { FeedbackSchema }

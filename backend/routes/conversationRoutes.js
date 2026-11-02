@@ -1,15 +1,12 @@
 const router = require('express').Router()
-const { listarConversaciones, actualizarTituloConversacion, eliminarConversacion } = require('../controllers/conversationController')
+const { listConversations, updateConversationTitle, deleteConversation } = require('../controllers/conversationController')
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const validateId = require('../middlewares/validateIdMiddleware')
 
-router.param('id', (req, res, next, id) => {
-  if (!UUID_RE.test(id)) return res.status(400).json({ error: 'El parametro id debe ser un UUID valido' })
-  next()
-})
+router.param('id', validateId)
 
-router.get('/', listarConversaciones)
-router.patch('/:id', actualizarTituloConversacion)
-router.delete('/:id', eliminarConversacion)
+router.get('/', listConversations)
+router.patch('/:id', updateConversationTitle)
+router.delete('/:id', deleteConversation)
 
 module.exports = router

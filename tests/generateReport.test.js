@@ -1,136 +1,136 @@
 jest.mock('../backend/repositories/messageRepository', () => ({
-  listarPorConversacion: jest.fn(),
-  crear: jest.fn()
+  listByConversation: jest.fn(),
+  create: jest.fn()
 }))
 
 jest.mock('../backend/repositories/toolExecutionRepository', () => ({
-  listarPorConversacion: jest.fn(),
-  crear: jest.fn()
+  listByConversation: jest.fn(),
+  create: jest.fn()
 }))
 
-const { manejador } = require('../backend/tools/generateReport')
-const repositorioMensaje = require('../backend/repositories/messageRepository')
-const repositorioEjecucion = require('../backend/repositories/toolExecutionRepository')
+const { handler } = require('../backend/tools/generateReport')
+const messageRepository = require('../backend/repositories/messageRepository')
+const toolExecutionRepository = require('../backend/repositories/toolExecutionRepository')
 
-const ID_CONVERSACION = 'conv-test-123'
+const CONVERSATION_ID = 'conv-test-123'
 
-const mensajesBase = [
-  { id: '1', role: 'user',      content: 'Primera consulta' },
-  { id: '2', role: 'assistant', content: 'Primera respuesta' },
-  { id: '3', role: 'user',      content: 'Segunda consulta' },
-  { id: '4', role: 'assistant', content: 'Segunda respuesta' },
+const baseMessages = [
+  { id: '1', role: 'user',      content: 'First question' },
+  { id: '2', role: 'assistant', content: 'First response' },
+  { id: '3', role: 'user',      content: 'Second question' },
+  { id: '4', role: 'assistant', content: 'Second response' },
 ]
 
-const ejecucionesBase = [
-  { tool_name: 'get_exchange_rates', latency_ms: 200, error: null, input: { rate_types: ['blue', 'oficial'] } },
+const baseExecutions = [
+  { tool_name: 'get_exchange_rates', latency_ms: 200, error: null, input: { rate_types: ['blue', 'official'] } },
   { tool_name: 'get_exchange_rates', latency_ms: 400, error: null, input: { rate_types: ['blue'] } },
   { tool_name: 'generate_session_report', latency_ms: 100, error: null, input: {} },
 ]
 
 beforeEach(() => {
-  repositorioMensaje.listarPorConversacion.mockResolvedValue(mensajesBase)
-  repositorioEjecucion.listarPorConversacion.mockResolvedValue(ejecucionesBase)
+  messageRepository.listByConversation.mockResolvedValue(baseMessages)
+  toolExecutionRepository.listByConversation.mockResolvedValue(baseExecutions)
 })
 
-describe('manejador generateReport — totalConsultas', () => {
-  test('cuenta solo los mensajes con role user', async () => {
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.totalConsultas).toBe(2)
+describe('generateReport — totalQueries', () => {
+  test('counts only user messages', async () => {
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.totalQueries).toBe(2)
   })
 
-  test('es 0 si no hay mensajes', async () => {
-    repositorioMensaje.listarPorConversacion.mockResolvedValue([])
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.totalConsultas).toBe(0)
-  })
-})
-
-describe('manejador generateReport — usoHerramientas', () => {
-  test('cuenta las ejecuciones agrupadas por nombre de herramienta', async () => {
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.usoHerramientas['get_exchange_rates']).toBe(2)
-    expect(resultado.usoHerramientas['generate_session_report']).toBe(1)
-  })
-
-  test('es un objeto vacío si no hay ejecuciones', async () => {
-    repositorioEjecucion.listarPorConversacion.mockResolvedValue([])
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.usoHerramientas).toEqual({})
+  test('returns zero when there are no messages', async () => {
+    messageRepository.listByConversation.mockResolvedValue([])
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.totalQueries).toBe(0)
   })
 })
 
-describe('manejador generateReport — latenciaPromedioMs', () => {
-  test('calcula el promedio correctamente', async () => {
+describe('generateReport — toolUsage', () => {
+  test('counts executions grouped by tool name', async () => {
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.toolUsage['get_exchange_rates']).toBe(2)
+    expect(result.toolUsage['generate_session_report']).toBe(1)
+  })
+
+  test('returns an empty object when there are no executions', async () => {
+    toolExecutionRepository.listByConversation.mockResolvedValue([])
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.toolUsage).toEqual({})
+  })
+})
+
+describe('generateReport — averageLatencyMs', () => {
+  test('calculates the rounded average latency', async () => {
     // (200 + 400 + 100) / 3 = 233
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.latenciaPromedioMs).toBe(233)
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.averageLatencyMs).toBe(233)
   })
 
-  test('es null si no hay ejecuciones', async () => {
-    repositorioEjecucion.listarPorConversacion.mockResolvedValue([])
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.latenciaPromedioMs).toBeNull()
+  test('returns null when there are no executions', async () => {
+    toolExecutionRepository.listByConversation.mockResolvedValue([])
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.averageLatencyMs).toBeNull()
   })
 
-  test('ignora ejecuciones con latency_ms null', async () => {
-    repositorioEjecucion.listarPorConversacion.mockResolvedValue([
+  test('ignores executions with null latency', async () => {
+    toolExecutionRepository.listByConversation.mockResolvedValue([
       { tool_name: 'get_exchange_rates', latency_ms: null, error: null, input: {} },
       { tool_name: 'get_exchange_rates', latency_ms: 300, error: null, input: {} },
     ])
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.latenciaPromedioMs).toBe(300)
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.averageLatencyMs).toBe(300)
   })
 })
 
-describe('manejador generateReport — tiposConsultados', () => {
-  test('deduplica los rate_types de todos los inputs', async () => {
-    // blue aparece en dos ejecuciones, oficial solo en una
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.tiposConsultados).toContain('blue')
-    expect(resultado.tiposConsultados).toContain('oficial')
-    expect(resultado.tiposConsultados.filter(t => t === 'blue')).toHaveLength(1)
+describe('generateReport — queriedTypes', () => {
+  test('deduplicates rate types across inputs', async () => {
+    // Blue appears twice; official appears once.
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.queriedTypes).toContain('blue')
+    expect(result.queriedTypes).toContain('official')
+    expect(result.queriedTypes.filter(t => t === 'blue')).toHaveLength(1)
   })
 
-  test('es array vacío si ninguna ejecución tiene rate_types', async () => {
-    repositorioEjecucion.listarPorConversacion.mockResolvedValue([
+  test('returns an empty array when no execution has rate types', async () => {
+    toolExecutionRepository.listByConversation.mockResolvedValue([
       { tool_name: 'generate_session_report', latency_ms: 100, error: null, input: {} }
     ])
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.tiposConsultados).toEqual([])
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.queriedTypes).toEqual([])
   })
 })
 
-describe('manejador generateReport — errores', () => {
-  test('incluye solo las ejecuciones con error', async () => {
-    repositorioEjecucion.listarPorConversacion.mockResolvedValue([
+describe('generateReport — errors', () => {
+  test('includes only failed executions', async () => {
+    toolExecutionRepository.listByConversation.mockResolvedValue([
       { tool_name: 'get_exchange_rates', latency_ms: 200, error: null,              input: {} },
-      { tool_name: 'get_exchange_rates', latency_ms: 150, error: 'API caída',       input: {} },
+      { tool_name: 'get_exchange_rates', latency_ms: 150, error: 'API unavailable',       input: {} },
       { tool_name: 'get_exchange_rates', latency_ms: 180, error: 'Timeout',         input: {} },
     ])
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.errores).toHaveLength(2)
-    expect(resultado.errores[0]).toEqual({ herramienta: 'get_exchange_rates', error: 'API caída' })
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.errors).toHaveLength(2)
+    expect(result.errors[0]).toEqual({ tool: 'get_exchange_rates', error: 'API unavailable' })
   })
 
-  test('es array vacío si no hubo errores', async () => {
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.errores).toEqual([])
+  test('returns an empty array when there are no errors', async () => {
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.errors).toEqual([])
   })
 })
 
-describe('manejador generateReport — totalEjecuciones y estructura', () => {
-  test('totalEjecuciones coincide con la cantidad de ejecuciones', async () => {
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.totalEjecuciones).toBe(3)
+describe('generateReport — totalExecutions and response shape', () => {
+  test('returns the total number of executions', async () => {
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.totalExecutions).toBe(3)
   })
 
-  test('incluye el idConversacion en la respuesta', async () => {
-    const resultado = await manejador({}, { idConversacion: ID_CONVERSACION })
-    expect(resultado.idConversacion).toBe(ID_CONVERSACION)
+  test('includes the conversation ID', async () => {
+    const result = await handler({}, { conversationId: CONVERSATION_ID })
+    expect(result.conversationId).toBe(CONVERSATION_ID)
   })
 
-  test('lanza error si el repositorio falla', async () => {
-    repositorioMensaje.listarPorConversacion.mockRejectedValue(new Error('DB no disponible'))
-    await expect(manejador({}, { idConversacion: ID_CONVERSACION })).rejects.toThrow('DB no disponible')
+  test('propagates repository errors', async () => {
+    messageRepository.listByConversation.mockRejectedValue(new Error('Database unavailable'))
+    await expect(handler({}, { conversationId: CONVERSATION_ID })).rejects.toThrow('Database unavailable')
   })
 })

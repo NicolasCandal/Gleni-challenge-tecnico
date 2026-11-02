@@ -1,114 +1,114 @@
-const { calcularBrecha, ordenarParaComprar, obtenerSenial } = require('../backend/services/exchangeService')
+const { calculateGap, sortBySellPrice, getSignals } = require('../backend/services/exchangeService')
 
-// Umbrales por defecto: SPREAD_ALTO=2.5, SPREAD_BAJO=1.5, BRECHA_ALTA=8, BRECHA_BAJA=3
+// Default thresholds: HIGH_SPREAD=2.5, LOW_SPREAD=1.5, HIGH_GAP=8, LOW_GAP=3
 
-const cotizacionesBase = [
-  { casa: 'oficial', nombre: 'Oficial', compra: 1000, venta: 1010, fechaActualizacion: '2026-01-01' },
-  { casa: 'blue',    nombre: 'Blue',    compra: 1150, venta: 1200, fechaActualizacion: '2026-01-01' },
-  { casa: 'bolsa',   nombre: 'Bolsa',   compra: 1080, venta: 1100, fechaActualizacion: '2026-01-01' },
+const baseQuotes = [
+  { rateType: 'official', name: 'Official', buy: 1000, sell: 1010, updatedAt: '2026-01-01' },
+  { rateType: 'blue',    name: 'Blue',    buy: 1150, sell: 1200, updatedAt: '2026-01-01' },
+  { rateType: 'mep',   name: 'MEP',   buy: 1080, sell: 1100, updatedAt: '2026-01-01' },
 ]
 
-describe('calcularBrecha', () => {
-  test('calcula la brecha porcentual correcta vs tipo oficial', () => {
-    const resultado = calcularBrecha(cotizacionesBase)
-    const blue = resultado.find(c => c.casa === 'blue')
+describe('calculateGap', () => {
+  test('calculates the percentage gap against the official sell rate', () => {
+    const result = calculateGap(baseQuotes)
+    const blue = result.find(c => c.rateType === 'blue')
     // (1200 - 1010) / 1010 * 100 ≈ 18.81
-    expect(blue.brecha).toBeCloseTo(18.81, 1)
+    expect(blue.gap).toBeCloseTo(18.81, 1)
   })
 
-  test('el tipo oficial tiene brecha 0', () => {
-    const resultado = calcularBrecha(cotizacionesBase)
-    const oficial = resultado.find(c => c.casa === 'oficial')
-    expect(oficial.brecha).toBe(0)
+  test('returns a zero gap for the official rate', () => {
+    const result = calculateGap(baseQuotes)
+    const official = result.find(c => c.rateType === 'official')
+    expect(official.gap).toBe(0)
   })
 
-  test('devuelve brecha null para todos si no hay tipo oficial', () => {
-    const sinOficial = cotizacionesBase.filter(c => c.casa !== 'oficial')
-    const resultado = calcularBrecha(sinOficial)
-    expect(resultado.every(c => c.brecha === null)).toBe(true)
+  test('returns null gaps when the official rate is unavailable', () => {
+    const withoutOfficial = baseQuotes.filter(c => c.rateType !== 'official')
+    const result = calculateGap(withoutOfficial)
+    expect(result.every(c => c.gap === null)).toBe(true)
   })
 })
 
-describe('ordenarParaComprar', () => {
-  test('ordena por precio de venta ascendente', () => {
-    const resultado = ordenarParaComprar(cotizacionesBase)
-    for (let i = 0; i < resultado.length - 1; i++) {
-      expect(resultado[i].venta).toBeLessThanOrEqual(resultado[i + 1].venta)
+describe('sortBySellPrice', () => {
+  test('sorts by sell price in ascending order', () => {
+    const result = sortBySellPrice(baseQuotes)
+    for (let i = 0; i < result.length - 1; i++) {
+      expect(result[i].sell).toBeLessThanOrEqual(result[i + 1].sell)
     }
   })
 
-  test('no muta el array original', () => {
-    const ordenOriginal = cotizacionesBase.map(c => c.casa)
-    ordenarParaComprar(cotizacionesBase)
-    expect(cotizacionesBase.map(c => c.casa)).toEqual(ordenOriginal)
+  test('does not mutate the original array', () => {
+    const originalOrder = baseQuotes.map(c => c.rateType)
+    sortBySellPrice(baseQuotes)
+    expect(baseQuotes.map(c => c.rateType)).toEqual(originalOrder)
   })
 })
 
-describe('obtenerSenial', () => {
-  test('devuelve "comprar" cuando spread y brecha están por debajo del umbral bajo', () => {
-    const cotizaciones = [{ casa: 'oficial', nombre: 'Oficial', spread: 1.0, brecha: 1.0 }]
-    const [resultado] = obtenerSenial(cotizaciones)
-    expect(resultado.senial).toBe('comprar')
+describe('getSignals', () => {
+  test('returns "buy" when spread and gap are below their lower thresholds', () => {
+    const quotes = [{ rateType: 'official', name: 'Official', spread: 1.0, gap: 1.0 }]
+    const [result] = getSignals(quotes)
+    expect(result.signal).toBe('buy')
   })
 
-  test('devuelve "esperar" cuando el spread supera el umbral alto', () => {
-    const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 3.0, brecha: 2.0 }]
-    const [resultado] = obtenerSenial(cotizaciones)
-    expect(resultado.senial).toBe('esperar')
+  test('returns "wait" when the spread exceeds the upper threshold', () => {
+    const quotes = [{ rateType: 'blue', name: 'Blue', spread: 3.0, gap: 2.0 }]
+    const [result] = getSignals(quotes)
+    expect(result.signal).toBe('wait')
   })
 
-  test('devuelve "esperar" cuando la brecha supera el umbral alto', () => {
-    const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 1.0, brecha: 10.0 }]
-    const [resultado] = obtenerSenial(cotizaciones)
-    expect(resultado.senial).toBe('esperar')
+  test('returns "wait" when the gap exceeds the upper threshold', () => {
+    const quotes = [{ rateType: 'blue', name: 'Blue', spread: 1.0, gap: 10.0 }]
+    const [result] = getSignals(quotes)
+    expect(result.signal).toBe('wait')
   })
 
-  test('devuelve "neutral" cuando los valores están en rango medio', () => {
-    const cotizaciones = [{ casa: 'bolsa', nombre: 'Bolsa', spread: 2.0, brecha: 5.0 }]
-    const [resultado] = obtenerSenial(cotizaciones)
-    expect(resultado.senial).toBe('neutral')
+  test('returns "neutral" for values between the thresholds', () => {
+    const quotes = [{ rateType: 'mep', name: 'MEP', spread: 2.0, gap: 5.0 }]
+    const [result] = getSignals(quotes)
+    expect(result.signal).toBe('neutral')
   })
 
-  test('devuelve la señal correcta para múltiples tipos simultáneamente', () => {
-    const cotizaciones = [
-      { casa: 'oficial', nombre: 'Oficial', spread: 1.0, brecha: 1.0 },
-      { casa: 'blue',    nombre: 'Blue',    spread: 3.5, brecha: 9.0 },
+  test('calculates signals for multiple rate types', () => {
+    const quotes = [
+      { rateType: 'official', name: 'Official', spread: 1.0, gap: 1.0 },
+      { rateType: 'blue',    name: 'Blue',    spread: 3.5, gap: 9.0 },
     ]
-    const resultado = obtenerSenial(cotizaciones)
-    expect(resultado[0].senial).toBe('comprar')
-    expect(resultado[1].senial).toBe('esperar')
+    const result = getSignals(quotes)
+    expect(result[0].signal).toBe('buy')
+    expect(result[1].signal).toBe('wait')
   })
 
-  // Sin tipo oficial en el conjunto, calcularBrecha pone brecha: null en todos.
-  // null coerce a 0 en comparaciones numéricas de JS: `null < BRECHA_BAJA` es true,
-  // lo que haría disparar 'comprar' aunque no haya referencia. El guard `brecha !== null`
-  // en la condición de 'comprar' evita ese falso positivo.
-  describe('brecha: null (sin tipo oficial de referencia)', () => {
-    test('no devuelve "comprar" aunque el spread sea bajo', () => {
-      const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 1.0, brecha: null }]
-      const [resultado] = obtenerSenial(cotizaciones)
-      expect(resultado.senial).not.toBe('comprar')
+  // Without an official quote, calculateGap assigns null to every gap.
+  // JavaScript coerces null to zero, so `null < LOW_GAP` is true.
+  // The explicit `gap !== null` check prevents a false buy signal
+  // when the reference rate is missing.
+  describe('null gap — no official reference rate', () => {
+    test('never returns "buy" without a reference, even with a low spread', () => {
+      const quotes = [{ rateType: 'blue', name: 'Blue', spread: 1.0, gap: null }]
+      const [result] = getSignals(quotes)
+      expect(result.signal).not.toBe('buy')
     })
 
-    test('devuelve "neutral" con spread bajo y brecha null', () => {
-      const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 1.0, brecha: null }]
-      const [resultado] = obtenerSenial(cotizaciones)
-      expect(resultado.senial).toBe('neutral')
+    test('returns "neutral" with a low spread and a null gap', () => {
+      const quotes = [{ rateType: 'blue', name: 'Blue', spread: 1.0, gap: null }]
+      const [result] = getSignals(quotes)
+      expect(result.signal).toBe('neutral')
     })
 
-    test('ningún tipo devuelve "comprar" cuando todos tienen brecha null', () => {
-      const cotizaciones = [
-        { casa: 'blue',  nombre: 'Blue',  spread: 1.0, brecha: null },
-        { casa: 'bolsa', nombre: 'Bolsa', spread: 1.2, brecha: null },
+    test('never returns "buy" when all gaps are null', () => {
+      const quotes = [
+        { rateType: 'blue',  name: 'Blue',  spread: 1.0, gap: null },
+        { rateType: 'mep', name: 'MEP', spread: 1.2, gap: null },
       ]
-      const resultado = obtenerSenial(cotizaciones)
-      expect(resultado.every(r => r.senial !== 'comprar')).toBe(true)
+      const result = getSignals(quotes)
+      expect(result.every(r => r.signal !== 'buy')).toBe(true)
     })
 
-    test('sí devuelve "esperar" cuando el spread es alto aunque la brecha sea null', () => {
-      const cotizaciones = [{ casa: 'blue', nombre: 'Blue', spread: 3.0, brecha: null }]
-      const [resultado] = obtenerSenial(cotizaciones)
-      expect(resultado.senial).toBe('esperar')
+    test('still returns "wait" for a high spread when the gap is null', () => {
+      const quotes = [{ rateType: 'blue', name: 'Blue', spread: 3.0, gap: null }]
+      const [result] = getSignals(quotes)
+      expect(result.signal).toBe('wait')
     })
   })
 })

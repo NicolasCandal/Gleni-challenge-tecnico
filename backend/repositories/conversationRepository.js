@@ -1,6 +1,6 @@
 const supabase = require('../infrastructure/supabaseClient')
 
-async function crear() {
+async function create() {
   const { data, error } = await supabase
     .from('conversations')
     .insert({})
@@ -11,12 +11,12 @@ async function crear() {
   return data
 }
 
-async function listar(ids) {
+async function list(ids) {
   if (!ids || ids.length === 0) return []
 
   const { data, error } = await supabase
     .from('conversations')
-    .select('id, titulo, created_at')
+    .select('id, title:titulo, created_at')
     .in('id', ids)
     .order('created_at', { ascending: false })
 
@@ -24,10 +24,10 @@ async function listar(ids) {
   return data ?? []
 }
 
-async function actualizarTitulo(id, titulo) {
+async function updateTitle(id, title) {
   const { error } = await supabase
     .from('conversations')
-    .update({ titulo })
+    .update({ titulo: title })
     .eq('id', id)
 
   if (error) throw error
@@ -35,7 +35,7 @@ async function actualizarTitulo(id, titulo) {
 
 
 
-async function eliminar(id) {
+async function remove(id) {
   const { error } = await supabase
     .from('conversations')
     .delete()
@@ -44,4 +44,4 @@ async function eliminar(id) {
   if (error) throw error
 }
 
-module.exports = { crear, listar, actualizarTitulo, eliminar }
+module.exports = { create, list, updateTitle, remove }

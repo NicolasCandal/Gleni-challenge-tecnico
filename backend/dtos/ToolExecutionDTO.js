@@ -1,20 +1,20 @@
-// Expone solo los campos que el cliente necesita, en camelCase. Se omite
-// conversation_id porque ya viaja en la URL del endpoint y es estructura interna.
-function crearEjecucionDTO({ id, tool_name, input, output, latency_ms, tokens_used, error, created_at }) {
+// Expose only the fields the client needs, in camelCase. Omit
+// conversation_id because it is already part of the endpoint URL.
+function createExecutionDTO({ id, tool_name, input, output, latency_ms, tokens_used, error, created_at }) {
   return {
     id,
-    herramienta: tool_name,
+    tool: tool_name,
     input,
     output,
-    latenciaMs: latency_ms,
-    tokensUsados: tokens_used,
+    latencyMs: latency_ms,
+    tokensUsed: tokens_used,
     error,
-    creadoEn: created_at
+    createdAt: created_at
   }
 }
 
-function crearRespuestaEjecucionesDTO(ejecuciones) {
-  return { ejecuciones }
+function createExecutionsResponseDTO(executions) {
+  return { executions }
 }
 
-module.exports = { crearEjecucionDTO, crearRespuestaEjecucionesDTO }
+module.exports = { createExecutionDTO, createExecutionsResponseDTO }

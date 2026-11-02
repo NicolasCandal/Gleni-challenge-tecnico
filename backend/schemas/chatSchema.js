@@ -1,8 +1,8 @@
 const { z } = require('zod')
 
-const EsquemaChat = z.object({
+const ChatSchema = z.object({
   conversationId: z.string().uuid().optional(),
-  mensaje: z.string().min(1, 'El mensaje no puede estar vacío').max(2000, 'El mensaje no puede superar los 2000 caracteres')
+  message: z.string().min(1, 'Message cannot be empty').max(2000, 'Message cannot exceed 2,000 characters')
 })
 
-module.exports = { EsquemaChat }
+module.exports = { ChatSchema }

@@ -1,23 +1,23 @@
-const servicioAgente = require('../services/agentService')
-const { eventoError, eventoFin } = require('../dtos/ChatDTO')
+const agentService = require('../services/agentService')
+const { errorEvent, doneEvent } = require('../dtos/ChatDTO')
 
 async function chat(req, res, next) {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
 
-  const enviarEvento = (evento) => {
-    res.write('data: ' + JSON.stringify(evento) + '\n\n')
+  const sendEvent = (event) => {
+    res.write('data: ' + JSON.stringify(event) + '\n\n')
   }
 
   try {
-    const { conversationId, mensaje } = req.body
+    const { conversationId, message } = req.body
 
-    const resultado = await servicioAgente.chat(conversationId ?? null, mensaje, enviarEvento)
+    const result = await agentService.chat(conversationId ?? null, message, sendEvent)
 
-    enviarEvento(eventoFin(resultado.conversationId, resultado.assistantMessageId, resultado.titulo))
+    sendEvent(doneEvent(result.conversationId, result.assistantMessageId, result.title))
     res.end()
   } catch (err) {
-    enviarEvento(eventoError(err.message || 'Error interno del servidor', err.status || 500))
+    sendEvent(errorEvent(err.message || 'Internal server error', err.status || 500))
     res.end()
   }
 }

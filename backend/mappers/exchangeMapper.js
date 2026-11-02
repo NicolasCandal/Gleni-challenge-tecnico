@@ -1,29 +1,29 @@
-const { crearCotizacionBaseDTO } = require('../dtos/ExchangeDTO')
+const { createBaseQuoteDTO } = require('../dtos/ExchangeDTO')
 
-function mapearCotizacion(item) {
-  return crearCotizacionBaseDTO(item)
+function mapQuote(item) {
+  return createBaseQuoteDTO(item)
 }
 
-function rawACotizaciones(datos, fuente, esFallback = false) {
-  const cotizaciones = datos
-    .filter(item => item.compra !== null && item.venta !== null)
-    .map(mapearCotizacion)
+function rawToQuotes(data, source, isFallback = false) {
+  const quotes = data
+    .filter(item => item.buy !== null && item.sell !== null)
+    .map(mapQuote)
 
-  const omitidos = datos
-    .filter(item => item.compra === null || item.venta === null)
-    .map(item => item.nombre)
+  const omitted = data
+    .filter(item => item.buy === null || item.sell === null)
+    .map(item => item.name)
 
-  const advertencia = esFallback
-    ? 'Datos parciales: solo oficial y blue disponibles porque la fuente principal no responde'
+  const warning = isFallback
+    ? 'Partial data: only official and blue rates are available because the primary source is unavailable'
     : null
 
   return {
-    cotizaciones,
-    omitidos,
-    advertencia,
-    fuente,
+    quotes,
+    omitted,
+    warning,
+    source,
     timestamp: new Date().toISOString()
   }
 }
 
-module.exports = { rawACotizaciones }
+module.exports = { rawToQuotes }

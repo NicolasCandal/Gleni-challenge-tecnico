@@ -1,10 +1,10 @@
 const supabase = require('../infrastructure/supabaseClient')
-const repositorioFeedback = require('./messageFeedbackRepository')
+const feedbackRepository = require('./messageFeedbackRepository')
 
-async function crear({ idConversacion, rol, contenido }) {
+async function create({ conversationId, role, content }) {
   const { data, error } = await supabase
     .from('messages')
-    .insert({ conversation_id: idConversacion, role: rol, content: contenido })
+    .insert({ conversation_id: conversationId, role: role, content: content })
     .select()
     .single()
 
@@ -12,27 +12,27 @@ async function crear({ idConversacion, rol, contenido }) {
   return data
 }
 
-async function listarPorConversacion(idConversacion) {
-  const { data: mensajes, error } = await supabase
+async function listByConversation(conversationId) {
+  const { data: messages, error } = await supabase
     .from('messages')
     .select('*')
-    .eq('conversation_id', idConversacion)
+    .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
 
   if (error) throw error
 
-  const idsMensajes = (mensajes ?? []).map(m => m.id)
-  let feedbackPorMensaje = {}
+  const messageIds = (messages ?? []).map(m => m.id)
+  let feedbackByMessage = {}
   try {
-    feedbackPorMensaje = await repositorioFeedback.listarPorMensajes(idsMensajes)
-  } catch (errFeedback) {
-    console.error('Error al obtener feedback de mensajes:', errFeedback.message)
+    feedbackByMessage = await feedbackRepository.listByMessages(messageIds)
+  } catch (feedbackError) {
+    console.error('Could not load message feedback:', feedbackError.message)
   }
 
-  return (mensajes ?? []).map(mensaje => ({
-    ...mensaje,
-    feedback: feedbackPorMensaje[mensaje.id] ?? null
+  return (messages ?? []).map(message => ({
+    ...message,
+    feedback: feedbackByMessage[message.id] ?? null
   }))
 }
 
-module.exports = { crear, listarPorConversacion }
+module.exports = { create, listByConversation }

@@ -1,11 +1,11 @@
-const repositorioMensaje = require('../repositories/messageRepository')
-const repositorioEjecucion = require('../repositories/toolExecutionRepository')
-const { crearReporteDTO } = require('../dtos/ReportDTO')
+const messageRepository = require('../repositories/messageRepository')
+const toolExecutionRepository = require('../repositories/toolExecutionRepository')
+const { createReportDTO } = require('../dtos/ReportDTO')
 
 
-const definicion = {
+const definition = {
   name: 'generate_session_report',
-  description: 'Genera un reporte de la sesión actual: total de consultas, herramientas usadas, latencia promedio, tipos de dólar consultados y errores. No llama a la API externa.',
+  description: 'Summarize the current session: total queries, tool usage, average latency, dollar rate types requested, and errors. Does not call an external market data API.',
   parameters: {
     type: 'object',
     properties: {},
@@ -13,43 +13,43 @@ const definicion = {
   }
 }
 
-async function manejador(_entrada, { idConversacion }) {
-  const [mensajes, ejecuciones] = await Promise.all([
-    repositorioMensaje.listarPorConversacion(idConversacion),
-    repositorioEjecucion.listarPorConversacion(idConversacion)
+async function handler(_input, { conversationId }) {
+  const [messages, executions] = await Promise.all([
+    messageRepository.listByConversation(conversationId),
+    toolExecutionRepository.listByConversation(conversationId)
   ])
 
-  const totalConsultas = mensajes.filter(m => m.role === 'user').length
+  const totalQueries = messages.filter(m => m.role === 'user').length
 
-  const usoHerramientas = ejecuciones.reduce((acumulador, e) => {
-    acumulador[e.tool_name] = (acumulador[e.tool_name] || 0) + 1
-    return acumulador
+  const toolUsage = executions.reduce((accumulator, e) => {
+    accumulator[e.tool_name] = (accumulator[e.tool_name] || 0) + 1
+    return accumulator
   }, {})
 
-  const ejecucionesConLatencia = ejecuciones.filter(e => e.latency_ms != null)
-  const latenciaPromedio = ejecucionesConLatencia.length
-    ? Math.round(ejecucionesConLatencia.reduce((suma, e) => suma + e.latency_ms, 0) / ejecucionesConLatencia.length)
+  const executionsWithLatency = executions.filter(e => e.latency_ms != null)
+  const averageLatency = executionsWithLatency.length
+    ? Math.round(executionsWithLatency.reduce((sum, e) => sum + e.latency_ms, 0) / executionsWithLatency.length)
     : null
 
-  const tiposConsultados = [...new Set(
-    ejecuciones
+  const queriedTypes = [...new Set(
+    executions
       .filter(e => e.input?.rate_types?.length)
       .flatMap(e => e.input.rate_types)
   )]
 
-  const errores = ejecuciones
+  const errors = executions
     .filter(e => e.error)
-    .map(e => ({ herramienta: e.tool_name, error: e.error }))
+    .map(e => ({ tool: e.tool_name, error: e.error }))
 
-  return crearReporteDTO({
-    idConversacion,
-    totalConsultas,
-    usoHerramientas,
-    latenciaPromedioMs: latenciaPromedio,
-    tiposConsultados,
-    errores,
-    totalEjecuciones: ejecuciones.length
+  return createReportDTO({
+    conversationId,
+    totalQueries,
+    toolUsage,
+    averageLatencyMs: averageLatency,
+    queriedTypes,
+    errors,
+    totalExecutions: executions.length
   })
 }
 
-module.exports = { definicion, manejador }
+module.exports = { definition, handler }

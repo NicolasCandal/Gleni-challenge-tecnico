@@ -1,28 +1,28 @@
-const repositorioEjecucion = require('../repositories/toolExecutionRepository')
-const repositorioMensaje = require('../repositories/messageRepository')
-const { crearMensajeDTO, crearRespuestaMensajesDTO } = require('../dtos/MessageDTO')
-const { crearEjecucionDTO, crearRespuestaEjecucionesDTO } = require('../dtos/ToolExecutionDTO')
+const toolExecutionRepository = require('../repositories/toolExecutionRepository')
+const messageRepository = require('../repositories/messageRepository')
+const { createMessageDTO, createMessagesResponseDTO } = require('../dtos/MessageDTO')
+const { createExecutionDTO, createExecutionsResponseDTO } = require('../dtos/ToolExecutionDTO')
 
-async function obtenerEjecuciones(req, res, next) {
+async function getExecutions(req, res, next) {
   try {
     const { id } = req.params
-    const filas = await repositorioEjecucion.listarPorConversacion(id)
-    const ejecuciones = filas.map(crearEjecucionDTO)
-    res.json(crearRespuestaEjecucionesDTO(ejecuciones))
+    const rows = await toolExecutionRepository.listByConversation(id)
+    const executions = rows.map(createExecutionDTO)
+    res.json(createExecutionsResponseDTO(executions))
   } catch (err) {
     next(err)
   }
 }
 
-async function obtenerMensajes(req, res, next) {
+async function getMessages(req, res, next) {
   try {
     const { id } = req.params
-    const filas = await repositorioMensaje.listarPorConversacion(id)
-    const mensajes = filas.map(crearMensajeDTO)
-    res.json(crearRespuestaMensajesDTO(mensajes))
+    const rows = await messageRepository.listByConversation(id)
+    const messages = rows.map(createMessageDTO)
+    res.json(createMessagesResponseDTO(messages))
   } catch (err) {
     next(err)
   }
 }
 
-module.exports = { obtenerEjecuciones, obtenerMensajes }
+module.exports = { getExecutions, getMessages }
